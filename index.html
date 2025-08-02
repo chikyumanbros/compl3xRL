@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>compl3xRL</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>compl3xRL</h1>
+        </div>
+        
+        <div class="game-main">
+            <div class="dungeon-view">
+                <pre id="game-screen"></pre>
+            </div>
+            
+            <div class="game-info">
+                <div class="info-left">
+                    <div class="player-stats">
+                        <h3>--- Player ---</h3>
+                        <div id="player-hp">HP: 100/100</div>
+                        <div id="player-level">Level: 1</div>
+                        <div id="player-exp">Exp: 0/100</div>
+                        <div id="player-pos">Position: (1,1)</div>
+                        <div id="hunger-status" style="display: none; font-weight: bold;">Not Hungry</div>
+                        <div id="weight-status">Weight: 0/0</div>
+                        <div id="encumbrance-status"></div>
+                        <div id="player-ac">AC: 20</div>
+                        <div id="player-tohit">To Hit: +11</div>
+                        <div id="player-damage">Damage: 12+d6</div>
+                        <div id="player-str">STR: 10</div>
+                        <div id="player-dex">DEX: 10</div>
+                        <div id="player-con">CON: 10</div>
+                        <div id="player-int">INT: 10</div>
+                        <div id="player-wis">WIS: 10</div>
+                        <div id="player-cha">CHA: 10</div>
+                        <div id="player-turn">Turn: <span id="turn-count">0</span></div>
+                        <div id="player-depth">Depth: <span id="dungeon-level">1</span></div>
+                    </div>
+                    
+                    <div class="equipment">
+                        <h3>--- Equipment ---</h3>
+                        <div id="equipment-container">
+                            <div id="weapon-slot">Weapon: Dagger</div>
+                            <div id="armor-slot">Armor: Leather Armor</div>
+                            <div id="shield-slot">Shield: None</div>
+                            <div id="helmet-slot">Helmet: None</div>
+                            <div id="gloves-slot">Gloves: None</div>
+                            <div id="boots-slot">Boots: None</div>
+                            <div id="ring-slot">Ring: None</div>
+                            <div id="amulet-slot">Amulet: None</div>
+                        </div>
+                    </div>
+                    
+                    <div class="inventory">
+                        <h3>--- Inventory ---</h3>
+                        <div id="inventory-container">
+                            <div>Empty</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="info-right">
+                    <div class="game-log">
+                        <h3>--- Game Log ---</h3>
+                        <div id="log-container">
+                            <div>Welcome to compl3xRL!</div>
+                            <div>Movement: hjkl + yubn (lowercase)</div>
+                            <div>Actions: . wait, o open door, c close door</div>
+                            <div>Equipment: i inventory, e equipment, w wear/wield, T take off</div>
+                            <div>Food: E eat food (select from menu)</div>
+                            <div>Levels: > go down, < go up</div>
+                            <div>System: Q quit, S save (uppercase)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="visible-monsters">
+                        <h3>--- Visible Monsters ---</h3>
+                        <div id="visible-monsters-container">
+                            <div>No monsters visible</div>
+                        </div>
+                    </div>
+                    
+                    <div class="nearby-items">
+                        <h3>--- Nearby Items ---</h3>
+                        <div id="nearby-items-container">
+                            <div>No items nearby</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sub-windows for inventory and equipment -->
+        <div id="sub-window-overlay" class="sub-window-overlay" style="display: none;">
+            <div id="sub-window" class="sub-window">
+                <div class="sub-window-header">
+                    <h3 id="sub-window-title">Window</h3>
+                    <button id="sub-window-close" class="sub-window-close">×</button>
+                </div>
+                <div id="sub-window-content" class="sub-window-content">
+                    <!-- Content will be dynamically generated -->
+                </div>
+                <div id="sub-window-input" class="sub-window-input" style="display: none;">
+                    <input type="text" id="sub-window-text-input" placeholder="Enter choice...">
+                    <button id="sub-window-confirm">OK</button>
+                    <button id="sub-window-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Game Scripts -->
+    <script src="renderer.js"></script>
+    <script src="dungeon.js"></script>
+    <script src="fov.js"></script>
+    <script src="noise.js"></script>
+    <script src="player.js"></script>
+    <script src="monster.js"></script>
+    <script src="item.js"></script>
+    <script src="subwindow.js"></script>
+    <script src="game.js"></script>
+</body>
+</html> 

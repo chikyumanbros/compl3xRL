@@ -1,0 +1,517 @@
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+body {
+    font-family: 'JetBrains Mono', Consolas, Menlo, Monaco, 'Source Code Pro', 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace;
+    background-color: #000;
+    color: #c0c0c0;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.3;
+    font-weight: 400;
+    font-variant-ligatures: none; /* ローグライクでは合字を無効化 */
+}
+
+.game-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 0;
+    margin: 0;
+}
+
+.game-header {
+    text-align: center;
+    padding: 0;
+    margin: 0;
+    background-color: #000;
+    border: none;
+}
+
+.game-header h1 {
+    font-size: 16px;
+    color: #ffffff;
+    background-color: #000;
+    padding: 4px;
+    margin: 0;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+.game-main {
+    display: flex;
+    flex: 1;
+    gap: 0;
+    padding: 0;
+    margin: 0;
+    height: calc(100vh - 80px);
+    overflow: hidden;
+}
+
+/* Dungeon view - ASCII game screen */
+.dungeon-view {
+    flex: 2;
+    background-color: #000;
+    border: 1px solid #808080;
+    padding: 8px;
+    margin: 0;
+    min-width: 0;
+    height: 100%;
+}
+
+#game-screen {
+    font-family: 'JetBrains Mono', Consolas, Menlo, Monaco, 'Source Code Pro', 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace;
+    letter-spacing: 0;
+    white-space: pre;
+    color: #c0c0c0;
+    background-color: #000;
+    margin: 0;
+    padding: 0;
+    font-weight: 400;
+    font-variant-ligatures: none;
+    border: none;
+    outline: none;
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Game info sidebar - 2 column layout */
+.game-info {
+    flex: 0 0 500px;
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    width: 500px;
+    background-color: #000;
+    border-left: 1px solid #808080;
+    padding: 4px;
+}
+
+.info-left, .info-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.player-stats, .game-log, .equipment, .inventory {
+    background-color: #000;
+    border: 1px solid #808080;
+    padding: 6px;
+    margin: 0;
+    border-radius: 0;
+    flex-shrink: 0;
+}
+
+.player-stats h3, .game-log h3, .equipment h3, .inventory h3 {
+    color: #ffffff;
+    margin: 0;
+    font-size: 13px;
+    border-bottom: 1px solid #808080;
+    padding: 2px 4px;
+    background-color: #808080;
+    color: #000;
+    font-weight: bold;
+}
+
+.player-stats div {
+    margin: 2px 0;
+    font-size: 12px;
+    padding: 0 4px;
+}
+
+/* Game log */
+.game-log {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 150px;
+}
+
+#log-container {
+    max-height: 250px;
+    overflow-y: auto;
+    font-size: 11px;
+    line-height: 1.2;
+    padding: 4px;
+}
+
+#log-container div {
+    margin: 1px 0;
+    padding: 0 4px;
+}
+
+#log-container div:nth-child(odd) {
+    background-color: transparent;
+}
+
+/* Battle log styles now integrated with game log */
+#log-container .damage { color: #ff6666; }
+#log-container .heal { color: #66ff66; }
+#log-container .death { color: #ff0000; font-weight: bold; }
+#log-container .victory { color: #ffff66; font-weight: bold; }
+
+/* Sub-window styles */
+.sub-window-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.sub-window {
+    background-color: #000;
+    border: 2px solid #808080;
+    border-radius: 0;
+    min-width: 400px;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+.sub-window-header {
+    background-color: #808080;
+    color: #000;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #808080;
+}
+
+.sub-window-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.sub-window-close {
+    background: none;
+    border: none;
+    color: #000;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sub-window-close:hover {
+    background-color: #666;
+    color: #fff;
+}
+
+.sub-window-content {
+    padding: 12px;
+    overflow-y: auto;
+    max-height: 400px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.sub-window-content div {
+    margin: 2px 0;
+    padding: 2px 0;
+}
+
+.sub-window-content .item-line {
+    cursor: pointer;
+    padding: 2px 4px;
+}
+
+.sub-window-content .item-line:hover {
+    background-color: #333;
+}
+
+.sub-window-content .item-line.selected {
+    background-color: #444;
+    color: #fff;
+}
+
+/* Food freshness colors */
+.sub-window-content div[data-fresh="fresh"] {
+    color: #90EE90; /* Light green for fresh food */
+}
+
+.sub-window-content div[data-fresh="aging"] {
+    color: #FFD700; /* Gold for aging food */
+}
+
+.sub-window-content div[data-fresh="stale"] {
+    color: #FFA500; /* Orange for stale food */
+}
+
+.sub-window-content div[data-fresh="spoiling"] {
+    color: #FF6347; /* Red for spoiling food */
+}
+
+.sub-window-input {
+    padding: 12px;
+    border-top: 1px solid #808080;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.sub-window-input input {
+    flex: 1;
+    background-color: #000;
+    border: 1px solid #808080;
+    color: #c0c0c0;
+    padding: 4px 8px;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.sub-window-input input:focus {
+    outline: none;
+    border-color: #fff;
+}
+
+.sub-window-input button {
+    background-color: #808080;
+    border: 1px solid #c0c0c0;
+    color: #000;
+    padding: 4px 12px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.sub-window-input button:hover {
+    background-color: #c0c0c0;
+}
+
+.sub-window-input button:active {
+    background-color: #666;
+}
+
+/* Equipment */
+.equipment {
+    max-height: 160px;
+}
+
+#equipment-container {
+    font-size: 11px;
+    padding: 2px;
+}
+
+#equipment-container div {
+    margin: 1px 0;
+    padding: 0 4px;
+}
+
+/* Inventory */
+.inventory {
+    max-height: 300px;
+}
+
+#inventory-container {
+    font-size: 11px;
+    padding: 2px;
+}
+
+#inventory-container div {
+    margin: 1px 0;
+    padding: 0 4px;
+}
+
+/* Controls info */
+.controls {
+    border-top: 1px solid #808080;
+    padding: 4px;
+    text-align: center;
+    background-color: #000;
+}
+
+.control-info {
+    font-size: 12px;
+    color: #c0c0c0;
+    margin: 0;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #000;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #808080;
+    border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #c0c0c0;
+}
+
+/* ASCII character color coding */
+.player { color: #ffffff; font-weight: bold; }
+.wall { color: #808080; }
+.floor { color: #404040; }
+.door_closed { color: #ffff00; }
+.door_open { color: #c0c0c0; }
+.door_locked { color: #ff8800; font-weight: bold; }
+.monster { color: #ff0000; }
+.item { color: #00ff00; }
+.item_multiple { color: #ffff00; } /* Yellow for multiple items */
+.item_memory { color: #006600; } /* Dimmed green for remembered items */
+.stairs { color: #ffff00; font-weight: bold; }
+
+/* Memory/explored but not visible colors */
+.wall_memory { color: #404040; }
+.floor_memory { color: #202020; }
+.door_closed_memory { color: #808000; }
+.door_open_memory { color: #606060; }
+.door_locked_memory { color: #664400; }
+.stairs_memory { color: #808000; }
+
+/* Monster colors - all white for classic roguelike */
+.monster { color: #ffffff; } /* White for all monsters */
+.monster_memory { color: #c0c0c0; } /* Light gray for remembered monsters */
+.monster_sleeping { color: #888888; } /* Dark gray for sleeping monsters */
+
+/* Visible monsters */
+.visible-monsters {
+    background-color: #000;
+    border: 1px solid #808080;
+    padding: 6px;
+    margin: 0;
+    border-radius: 0;
+    flex-shrink: 0;
+    min-height: 120px;
+}
+
+.visible-monsters h3 {
+    color: #ffffff;
+    margin: 0;
+    font-size: 13px;
+    border-bottom: 1px solid #808080;
+    padding: 2px 4px;
+    background-color: #808080;
+    color: #000;
+    font-weight: bold;
+}
+
+#visible-monsters-container {
+    max-height: 120px;
+    overflow-y: auto;
+    font-size: 11px;
+    line-height: 1.2;
+    padding: 4px;
+}
+
+#visible-monsters-container div {
+    margin: 1px 0;
+    padding: 0 4px;
+    display: flex;
+}
+
+/* Nearby items */
+.nearby-items {
+    background-color: #000;
+    border: 1px solid #808080;
+    padding: 6px;
+    margin: 0;
+    border-radius: 0;
+    flex-shrink: 0;
+    min-height: 100px;
+}
+
+.nearby-items h3 {
+    color: #ffffff;
+    margin: 0;
+    font-size: 13px;
+    border-bottom: 1px solid #808080;
+    padding: 2px 4px;
+    background-color: #808080;
+    color: #000;
+    font-weight: bold;
+}
+
+#nearby-items-container {
+    max-height: 100px;
+    overflow-y: auto;
+    font-size: 11px;
+    line-height: 1.2;
+    padding: 4px;
+}
+
+#nearby-items-container div {
+    margin: 1px 0;
+    padding: 0 4px;
+    color: #cccccc;
+}
+
+.monster-entry {
+    margin-bottom: 2px;
+    padding-bottom: 2px;
+}
+
+
+
+.monster-name {
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.monster-symbol {
+    color: #ff6666;
+    font-weight: bold;
+    margin-right: 8px;
+}
+
+.monster-direction {
+    color: #888;
+    font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .game-main {
+        flex-direction: column;
+    }
+    
+    .game-info {
+        flex-direction: column;
+        max-width: none;
+        border-left: none;
+        border-top: 1px solid #808080;
+    }
+    
+    .info-left, .info-right {
+        flex-direction: row;
+    }
+    
+    .player-stats, .game-log, .equipment, .inventory {
+        flex: 1;
+        border-right: 1px solid #808080;
+    }
+    
+    .inventory {
+        border-right: none;
+    }
+} 
