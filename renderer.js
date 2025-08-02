@@ -706,7 +706,9 @@ class Renderer {
             if (equipment.armor) {
                 const enchantDisplay = equipment.armor.enchantment > 0 ? `+${equipment.armor.enchantment} ` : 
                                       equipment.armor.enchantment < 0 ? `${equipment.armor.enchantment} ` : '';
-                armorSlot.textContent = `Armor: ${enchantDisplay}${equipment.armor.name} (AC +${equipment.armor.armorClassBonus})`;
+                // Show AC improvement
+                const acBonus = equipment.armor.armorClassBonus || 0;
+                armorSlot.textContent = `Armor: ${enchantDisplay}${equipment.armor.name} (AC -${acBonus})`;
             } else {
                 armorSlot.textContent = `Armor: None`;
             }
@@ -718,7 +720,9 @@ class Renderer {
             if (equipment.shield) {
                 const enchantDisplay = equipment.shield.enchantment > 0 ? `+${equipment.shield.enchantment} ` : 
                                       equipment.shield.enchantment < 0 ? `${equipment.shield.enchantment} ` : '';
-                shieldSlot.textContent = `Shield: ${enchantDisplay}${equipment.shield.name} (AC +${equipment.shield.armorClassBonus})`;
+                // Show shield AC improvement
+                const acBonus = equipment.shield.armorClassBonus || 0;
+                shieldSlot.textContent = `Shield: ${enchantDisplay}${equipment.shield.name} (AC -${acBonus})`;
             } else {
                 shieldSlot.textContent = `Shield: None`;
             }

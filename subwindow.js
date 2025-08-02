@@ -189,7 +189,8 @@ class SubWindow {
             }
             if (item.toHitBonus) properties.push(`To Hit: +${item.toHitBonus}`);
         } else if (item.type === 'armor' || item.type === 'shield') {
-            if (item.armorClassBonus) properties.push(`AC Bonus: +${item.armorClassBonus}`);
+            // Unified AC display for all armor/shield items
+            if (item.armorClassBonus) properties.push(`AC -${item.armorClassBonus}`);
         } else if (item.type === 'potion') {
             if (item.healDice) properties.push(`Healing: ${item.healDice} HP`);
             else if (item.healAmount) properties.push(`Healing: ${item.healAmount} HP`);
@@ -269,6 +270,7 @@ class SubWindow {
                     const weaponDamage = item.weaponDamage || item.damage || '?';
                     statsText = ` (${item.damage}+d${weaponDamage})`;
                 } else if (item.armorClassBonus) {
+                    // Unified AC display for all armor/shield items
                     statsText = ` (AC -${item.armorClassBonus})`;
                 }
                 slotDiv.innerHTML = `<span style="color: #00ff00;">${slot.name} ${slot.keyHint}:</span> ${item.name}${statsText}`;

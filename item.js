@@ -505,7 +505,7 @@ const EQUIPMENT_TYPES = {
             material: 'leather',
             symbol: '(',
             color: '#8B4513',
-            description: 'Basic leather armor. Light and flexible. (+2 AC)'
+            description: 'Basic leather armor. Light and flexible. (AC -2)'
         },
         studded: {
             name: 'Studded Leather',
@@ -516,7 +516,7 @@ const EQUIPMENT_TYPES = {
             material: 'leather',
             symbol: '(',
             color: '#654321',
-            description: 'Leather armor reinforced with metal studs. (+3 AC)'
+            description: 'Leather armor reinforced with metal studs. (AC -3)'
         },
         chainmail: {
             name: 'Chain Mail',
@@ -527,7 +527,7 @@ const EQUIPMENT_TYPES = {
             material: 'steel',
             symbol: '[',
             color: '#C0C0C0',
-            description: 'Interlocking metal rings. Excellent protection. (+5 AC)'
+            description: 'Interlocking metal rings. Excellent protection. (AC -5)'
         },
         platemail: {
             name: 'Plate Mail',
@@ -538,7 +538,7 @@ const EQUIPMENT_TYPES = {
             material: 'steel',
             symbol: ']',
             color: '#DCDCDC',
-            description: 'Full plate armor. Maximum protection for warriors. (+7 AC)'
+            description: 'Full plate armor. Maximum protection for warriors. (AC -7)'
         }
     },
     
@@ -553,7 +553,7 @@ const EQUIPMENT_TYPES = {
             material: 'wood',
             symbol: ')',
             color: '#8B4513',
-            description: 'A small round shield. Easy to maneuver. (+1 AC)'
+            description: 'A small round shield. Easy to maneuver. (AC -1)'
         },
         smallShield: {
             name: 'Small Shield',
@@ -564,7 +564,7 @@ const EQUIPMENT_TYPES = {
             material: 'wood',
             symbol: ')',
             color: '#8B4513',
-            description: 'A standard wooden shield with metal rim. (+1 AC)'
+            description: 'A standard wooden shield with metal rim. (AC -1)'
         },
         largeShield: {
             name: 'Large Shield',
@@ -575,7 +575,7 @@ const EQUIPMENT_TYPES = {
             material: 'steel',
             symbol: ')',
             color: '#C0C0C0',
-            description: 'A heavy shield offering excellent protection. (+2 AC)'
+            description: 'A heavy shield offering excellent protection. (AC -2)'
         }
     },
     
