@@ -73,16 +73,16 @@ class Game {
     initializeGameContent() {
         // Check for existing autosave
         if (this.hasAutosave()) {
-            console.log('Autosave detected, prompting user...');
+    
             // Don't initialize game yet, wait for user choice
             this.promptLoadAutosave();
         } else {
-            console.log('No autosave found, starting new game...');
+    
             // Generate initial level if no save exists
             this.generateNewLevel();
             // Ensure game is properly initialized
             if (!this.player || !this.dungeon) {
-                console.warn('Game initialization failed, creating fallback level');
+
                 this.generateNewLevel();
             }
         }
@@ -92,12 +92,11 @@ class Game {
      * Generate a new dungeon level or load existing one
      */
     generateNewLevel() {
-        console.log(`Accessing level ${this.currentLevel}...`);
-        console.log(`Stored levels: [${Array.from(this.levels.keys()).join(', ')}]`);
+
         
         // Check if level already exists
         if (this.levels.has(this.currentLevel)) {
-            console.log(`Found existing level ${this.currentLevel} in storage`);
+
             const loaded = this.loadLevel(this.currentLevel);
             if (loaded) {
                 // Successfully loaded existing level
@@ -107,7 +106,7 @@ class Game {
         }
         
         // Level doesn't exist, create new one
-        console.log(`Creating new level ${this.currentLevel}`);
+        
         this.createNewLevel();
         this.renderer.addLogMessage(`Welcome to level ${this.currentLevel}!`);
         
@@ -159,12 +158,12 @@ class Game {
     loadLevel(levelNumber, preservePlayerPosition = false) {
         const levelData = this.levels.get(levelNumber);
         if (!levelData) {
-            console.warn(`Level ${levelNumber} not found in storage`);
+
             // Don't create new level here - this means level was never created
             return false;
         }
         
-        console.log(`Loading existing level ${levelNumber} from storage`);
+
         
         // Restore dungeon
         this.dungeon = levelData.dungeon;
@@ -178,35 +177,35 @@ class Game {
                 if (levelNumber > this.previousLevel) {
                     // Coming from above (descended) - use stairs_up position
                     targetStairs = this.findTileOfType('stairs_up');
-                    console.log(`Player descended from level ${this.previousLevel} to ${levelNumber}, placing on stairs_up`);
+        
                 } else if (levelNumber < this.previousLevel) {
                     // Coming from below (ascended) - use stairs_down position  
                     targetStairs = this.findTileOfType('stairs_down');
-                    console.log(`Player ascended from level ${this.previousLevel} to ${levelNumber}, placing on stairs_down`);
+        
                 } else {
                     // Same level - this shouldn't happen but use stairs_up as fallback
                     targetStairs = this.findTileOfType('stairs_up');
-                    console.log(`Same level ${levelNumber}, placing on stairs_up as fallback`);
+        
                 }
             } else {
                 // No previous level info, use stairs_up as default
                 targetStairs = this.findTileOfType('stairs_up');
-                console.log(`No previous level info, placing on stairs_up`);
+    
             }
             
             if (targetStairs) {
                 this.player.x = targetStairs.x;
                 this.player.y = targetStairs.y;
-                console.log(`Player positioned at (${this.player.x}, ${this.player.y}) on stairs`);
+        
             } else {
-                console.warn(`No appropriate stairs found on level ${levelNumber}`);
+
                 // Fallback to start position
                 const startPos = this.dungeon.getStartPosition();
                 this.player.x = startPos.x;
                 this.player.y = startPos.y;
             }
         } else if (preservePlayerPosition) {
-            console.log(`Preserving player position at (${this.player.x}, ${this.player.y}) for autosave load`);
+
         }
         
         // Restore systems
@@ -234,11 +233,11 @@ class Game {
      */
     saveLevelState() {
         if (!this.dungeon) {
-            console.warn('Cannot save level state: no dungeon');
+
             return;
         }
         
-        console.log(`Saving level ${this.currentLevel} state...`);
+
         
         // Save FOV state
         const fovState = this.fov ? this.fov.saveState() : null;
@@ -271,7 +270,7 @@ class Game {
         // Remove oldest levels until we're under the limit
         while (this.levels.size > this.maxStoredLevels) {
             const [oldestLevel] = levelEntries.shift();
-            console.log(`Cleaning up old level ${oldestLevel}`);
+
             this.levels.delete(oldestLevel);
         }
     }
@@ -286,7 +285,7 @@ class Game {
             const saveData = localStorage.getItem(this.saveKey);
             return saveData !== null;
         } catch (error) {
-            console.warn('Error checking autosave:', error);
+
             return false;
         }
     }
@@ -296,7 +295,7 @@ class Game {
      */
     promptLoadAutosave() {
         if (!window.subWindow) {
-            console.warn('SubWindow not available, using browser confirm');
+
             const loadSave = confirm('Autosave found! Do you want to continue your previous game?');
             this.handleLoadAutosaveChoice(loadSave);
             return;
@@ -330,14 +329,14 @@ class Game {
      * Handle the choice for loading autosave
      */
     handleLoadAutosaveChoice(loadSave) {
-        console.log(`User chose to ${loadSave ? 'load' : 'skip'} autosave`);
+
         
         if (loadSave) {
             if (this.loadGame()) {
                 this.renderer.addLogMessage('Game loaded from autosave!');
                 // Verify load was successful
                 if (!this.player || !this.dungeon) {
-                    console.warn('Autosave load verification failed, creating new game');
+    
                     this.generateNewLevel();
                 } else {
                     // Update display after loading
@@ -354,7 +353,7 @@ class Game {
         
         // Ensure game is properly initialized after choice
         if (!this.player || !this.dungeon) {
-            console.warn('Game initialization failed after choice, creating fallback level');
+            
             this.generateNewLevel();
         }
     }
@@ -367,8 +366,7 @@ class Game {
             // Save current level state first
             this.saveLevelState();
             
-            console.log(`Saving game state - Level: ${this.currentLevel}, Player: ${this.player?.level}, HP: ${this.player?.hp}`);
-            console.log(`Player position: (${this.player?.x}, ${this.player?.y})`);
+            
             
             // Prepare complete game state
             const gameState = {
@@ -450,7 +448,7 @@ class Game {
             
             // Only log manual saves or important autosaves
             if (this.isManualSave) {
-                console.log('Game saved successfully (manual)');
+    
                 this.isManualSave = false; // Reset flag
             } else {
                 // Silent autosave, only log errors
@@ -471,13 +469,12 @@ class Game {
         try {
             const saveData = localStorage.getItem(this.saveKey);
             if (!saveData) {
-                console.warn('No save data found');
+
                 return false;
             }
             
             const gameState = JSON.parse(saveData);
-            console.log(`Loading game from ${new Date(gameState.timestamp).toLocaleString()}`);
-            console.log(`Save contains - Level: ${gameState.currentLevel}, Player Level: ${gameState.player?.level}`);
+            
             
             // Restore basic game state
             this.currentLevel = gameState.currentLevel;
@@ -515,15 +512,14 @@ class Game {
             if (this.levels.has(this.currentLevel)) {
                 this.loadLevel(this.currentLevel, true); // Preserve saved player position
             } else {
-                console.warn('Current level not found in save, generating new');
+
                 this.generateNewLevel();
             }
             
             // Ensure FOV is updated with restored player position
             this.updateFOV();
             
-            console.log('Game loaded successfully');
-            console.log(`Final player position: (${this.player?.x}, ${this.player?.y})`);
+            
             return true;
             
         } catch (error) {
@@ -541,19 +537,19 @@ class Game {
         // Since we save immediately after every action, this timer is now used for:
         // - Periodic cleanup
         // - Backup verification
-        // - Debug monitoring
+
         setInterval(() => {
             if (this.gameState === 'playing' && this.player) {
                 // Verify save integrity occasionally
                 const hasValidSave = this.hasAutosave();
                 if (!hasValidSave) {
-                    console.warn('Autosave verification failed, creating backup save');
+    
                     this.saveGame();
                 }
             }
         }, 30000); // Check every 30 seconds for integrity
         
-        console.log('Immediate autosave system initialized');
+
     }
     
     /**
@@ -562,9 +558,9 @@ class Game {
     deleteAutosave() {
         try {
             localStorage.removeItem(this.saveKey);
-            console.log('Autosave deleted');
+    
         } catch (error) {
-            console.warn('Error deleting autosave:', error);
+
         }
     }
     
@@ -664,7 +660,7 @@ class Game {
         // Create new monster spawner with proper dungeon reference
         const targetDungeon = dungeon || this.dungeon;
         if (!targetDungeon) {
-            console.warn('No dungeon available for MonsterSpawner');
+
             return null;
         }
         const monsterSpawner = new MonsterSpawner(targetDungeon);
@@ -792,7 +788,7 @@ class Game {
             // Create new item manager with proper dungeon reference
             const targetDungeon = dungeon || this.dungeon;
             if (!targetDungeon) {
-                console.warn('No dungeon available for ItemManager');
+    
                 return null;
             }
             const itemManager = new ItemManager(targetDungeon);
@@ -832,16 +828,16 @@ class Game {
                                 
                                 itemManager.addItem(item);
                             } else {
-                                console.warn('Skipping item with invalid coordinates:', itemInfo);
+            
                             }
                         }
                     } catch (error) {
-                        console.warn('Failed to deserialize item:', itemInfo, error);
+    
                     }
                 });
             }
             
-            console.log(`Restored ${itemManager.getAllItems().length} items`);
+    
             return itemManager;
         } catch (error) {
             console.error('Error deserializing items:', error);
@@ -859,7 +855,7 @@ class Game {
         // Create new player instance
         const player = new Player(playerData.x, playerData.y);
         
-        console.log(`Restoring player at position (${playerData.x}, ${playerData.y})`);
+
         
         // Restore all player properties
         player.level = playerData.level;
@@ -977,7 +973,7 @@ class Game {
         
         // Safety check - ensure game is properly initialized
         if (!this.player || !this.dungeon) {
-            console.warn('Game not properly initialized, ignoring input');
+
             return;
         }
         
@@ -1126,20 +1122,20 @@ class Game {
                 // Stairs movement: > (Shift+Period) down, < (Shift+Comma) up
                 if (event.shiftKey) {
                     event.preventDefault();
-                    console.log(`Stairs key pressed: ${event.code} with Shift`);
+            
                     if (event.code === 'Period') {
                         // > key - go down stairs
-                        console.log('Attempting to go down stairs with > key');
+            
                         this.goDownStairs();
                     } else if (event.code === 'Comma') {
                         // < key - go up stairs  
-                        console.log('Attempting to go up stairs with < key');
+            
                         this.goUpStairs();
                     }
                 } else if (event.code === 'Period') {
                     // . key - wait/rest (lowercase)
                     event.preventDefault();
-                    console.log('Rest key pressed (.)');
+            
                     const playerMoved = this.player.rest();
                     if (playerMoved) {
                         this.processTurn();
@@ -1203,13 +1199,13 @@ class Game {
     movePlayer(dx, dy) {
         // Safety check: ensure player exists
         if (!this.player) {
-            console.warn('Cannot move player: player not initialized');
+
             return false;
         }
         
         // Safety check: ensure dungeon exists
         if (!this.dungeon) {
-            console.warn('Cannot move player: dungeon not initialized');
+
             return false;
         }
         
@@ -1267,7 +1263,7 @@ class Game {
      */
     goDownStairs() {
         const tile = this.dungeon.getTile(this.player.x, this.player.y);
-        console.log(`Attempting to go down stairs. Tile type: ${tile.type}, Player at: (${this.player.x}, ${this.player.y})`);
+
         
         if (tile.type === 'stairs_down' || tile.type === 'stairs_up') {
             // Save current level state before leaving
@@ -1283,7 +1279,7 @@ class Game {
             // Go to next level
             this.currentLevel++;
             this.renderer.addLogMessage(`Descending to level ${this.currentLevel}...`);
-            console.log(`Going down from level ${this.previousLevel} to level ${this.currentLevel}`);
+
             
             // Generate or load the next level
             this.generateNewLevel();
@@ -1296,7 +1292,7 @@ class Game {
             return true;
         } else {
             this.renderer.addLogMessage('You are not standing on stairs.');
-            console.log(`Cannot descend: not on stairs (tile type: ${tile.type})`);
+
             return false;
         }
     }
@@ -1306,12 +1302,12 @@ class Game {
      */
     goUpStairs() {
         const tile = this.dungeon.getTile(this.player.x, this.player.y);
-        console.log(`Attempting to go up stairs. Tile type: ${tile.type}, Player at: (${this.player.x}, ${this.player.y})`);
+
         
         if (tile.type === 'stairs_up' || tile.type === 'stairs_down') {
             if (this.currentLevel <= 1) {
                 this.renderer.addLogMessage('You cannot go up from the first level.');
-                console.log(`Cannot ascend: already at first level`);
+    
                 return false;
             }
             
@@ -1328,7 +1324,7 @@ class Game {
             // Go to previous level
             this.currentLevel--;
             this.renderer.addLogMessage(`Ascending to level ${this.currentLevel}...`);
-            console.log(`Going up from level ${this.previousLevel} to level ${this.currentLevel}`);
+
             
             // Generate or load the previous level
             this.generateNewLevel();
@@ -1341,7 +1337,7 @@ class Game {
             return true;
         } else {
             this.renderer.addLogMessage('You are not standing on stairs.');
-            console.log(`Cannot ascend: not on stairs (tile type: ${tile.type})`);
+
             return false;
         }
     }
@@ -1366,7 +1362,7 @@ class Game {
     processTurn() {
         // Safety check: ensure game is properly initialized
         if (!this.player || !this.dungeon) {
-            console.warn('Cannot process turn: game not properly initialized');
+
             return;
         }
         
@@ -1955,7 +1951,7 @@ class Game {
      * Restart the game
      */
     restartGame() {
-        console.log('Restarting game...');
+
         
         // Clear autosave for fresh start
         this.deleteAutosave();
@@ -1989,7 +1985,7 @@ class Game {
         this.updateFOV();
         this.render();
         
-        console.log('Game restarted successfully!');
+
     }
     
     /**
@@ -2436,6 +2432,6 @@ class Game {
 
 // Initialize game when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Page loaded, starting game...');
+    
     window.game = new Game();
 }); 

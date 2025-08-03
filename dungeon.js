@@ -117,7 +117,7 @@ class Dungeon {
      * Generate the dungeon - Classic maze-like style
      */
     generate() {
-        console.log('Generating dungeon...');
+
         
         // Generate main rooms
         this.generateRooms();
@@ -140,7 +140,7 @@ class Dungeon {
         // Add stairs
         this.addStairs();
         
-        console.log(`Generated ${this.rooms.length} rooms with maze passages`);
+
     }
     
     /**

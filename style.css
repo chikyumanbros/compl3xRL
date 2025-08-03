@@ -85,11 +85,11 @@ body {
 
 /* Game info sidebar - 2 column layout */
 .game-info {
-    flex: 0 0 500px;
+    flex: 0 0 750px;
     display: flex;
     flex-direction: row;
     gap: 4px;
-    width: 500px;
+    width: 750px;
     background-color: #000;
     border-left: 1px solid #808080;
     padding: 4px;
@@ -308,7 +308,7 @@ body {
 
 /* Equipment */
 .equipment {
-    max-height: 160px;
+    max-height: 300px;
 }
 
 #equipment-container {

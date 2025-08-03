@@ -63,6 +63,8 @@ class Monster {
                 armorClass: 14,
                 damage: 0,
                 weaponDamage: 2, // d2
+                protection: 0, // No natural armor
+                penetration: 0, // Bite/natural attack
                 exp: 1,
                 minDepth: 1,
                 maxDepth: 3
@@ -76,6 +78,8 @@ class Monster {
                 armorClass: 12,
                 damage: 0,
                 weaponDamage: 2, // d2
+                protection: 0, // No natural armor
+                penetration: 0, // Bite/natural attack
                 exp: 1,
                 minDepth: 1,
                 maxDepth: 4
@@ -89,6 +93,8 @@ class Monster {
                 armorClass: 13,
                 damage: 0,
                 weaponDamage: 3, // d3
+                protection: 0, // No natural armor
+                penetration: 0, // Bite/natural attack
                 exp: 1,
                 minDepth: 1,
                 maxDepth: 3
@@ -102,6 +108,8 @@ class Monster {
                 armorClass: 13,
                 damage: 0,
                 weaponDamage: 3, // d3
+                protection: 1, // Chitinous shell
+                penetration: 1, // Sharp fangs
                 exp: 2,
                 minDepth: 1,
                 maxDepth: 4
@@ -115,6 +123,8 @@ class Monster {
                 armorClass: 12,
                 damage: 1,
                 weaponDamage: 3, // d3
+                protection: 1, // Leather armor
+                penetration: 1, // Short sword
                 exp: 3,
                 minDepth: 1,
                 maxDepth: 5
@@ -128,6 +138,7 @@ class Monster {
                 armorClass: 13,
                 damage: 0,
                 weaponDamage: 2, // d2
+                penetration: 0, // Mandibles/natural attack
                 exp: 2,
                 minDepth: 1,
                 maxDepth: 4
@@ -141,6 +152,7 @@ class Monster {
                 armorClass: 11,
                 damage: 0,
                 weaponDamage: 2, // d2 + poison
+                penetration: 1, // Venomous fangs
                 exp: 2,
                 minDepth: 1,
                 maxDepth: 5
@@ -154,6 +166,7 @@ class Monster {
                 armorClass: 12,
                 damage: 0,
                 weaponDamage: 3, // d3
+                penetration: 0, // Bite/natural attack
                 exp: 2,
                 minDepth: 1,
                 maxDepth: 4
@@ -167,6 +180,7 @@ class Monster {
                 armorClass: 13,
                 damage: 0,
                 weaponDamage: 2, // d2
+                penetration: 0, // Bite/natural attack
                 exp: 1,
                 minDepth: 1,
                 maxDepth: 3
@@ -182,6 +196,8 @@ class Monster {
                 armorClass: 11,
                 damage: 1,
                 weaponDamage: 4, // d4
+                protection: 1, // Leather armor
+                penetration: 1, // Short sword
                 exp: 4,
                 minDepth: 2,
                 maxDepth: 6
@@ -195,6 +211,8 @@ class Monster {
                 armorClass: 10,
                 damage: 2,
                 weaponDamage: 4, // d4
+                protection: 2, // Studded leather + tough skin
+                penetration: 2, // Battle axe
                 exp: 8,
                 minDepth: 2,
                 maxDepth: 7
@@ -208,6 +226,7 @@ class Monster {
                 armorClass: 11,
                 damage: 1,
                 weaponDamage: 4, // d4 bite
+                penetration: 0, // Bite/natural attack
                 exp: 6,
                 minDepth: 2,
                 maxDepth: 6
@@ -221,6 +240,7 @@ class Monster {
                 armorClass: 12,
                 damage: 1,
                 weaponDamage: 6, // d6 weapon
+                penetration: 1, // Basic weapon
                 exp: 7,
                 minDepth: 3,
                 maxDepth: 8
@@ -234,6 +254,7 @@ class Monster {
                 armorClass: 13,
                 damage: 1,
                 weaponDamage: 4, // d4
+                penetration: 0, // Claws/natural attack
                 exp: 5,
                 minDepth: 2,
                 maxDepth: 7
@@ -247,6 +268,7 @@ class Monster {
                 armorClass: 9,
                 damage: 2,
                 weaponDamage: 6, // d6 axe
+                penetration: 2, // Quality weapon (axe)
                 exp: 10,
                 minDepth: 3,
                 maxDepth: 8
@@ -260,6 +282,7 @@ class Monster {
                 armorClass: 10,
                 damage: 2,
                 weaponDamage: 6, // d6 bow
+                penetration: 2, // Quality weapon (bow)
                 exp: 9,
                 minDepth: 3,
                 maxDepth: 8
@@ -273,6 +296,7 @@ class Monster {
                 armorClass: 14,
                 damage: 0,
                 weaponDamage: 1, // paralysis
+                penetration: 0, // Paralysis gaze (special)
                 exp: 4,
                 minDepth: 2,
                 maxDepth: 6
@@ -286,6 +310,7 @@ class Monster {
                 armorClass: 11,
                 damage: 1,
                 weaponDamage: 3, // d3 + steal
+                penetration: 0, // Stealing touch (special)
                 exp: 6,
                 minDepth: 3,
                 maxDepth: 7
@@ -299,6 +324,7 @@ class Monster {
                 armorClass: 12,
                 damage: 0,
                 weaponDamage: 3, // d3 + poison
+                penetration: 1, // Venomous fangs
                 exp: 4,
                 minDepth: 2,
                 maxDepth: 6
@@ -314,6 +340,7 @@ class Monster {
                 armorClass: 9,
                 damage: 2,
                 weaponDamage: 6, // d6
+                penetration: 2, // Quality weapon (spear)
                 exp: 12,
                 minDepth: 4,
                 maxDepth: 9
@@ -327,6 +354,7 @@ class Monster {
                 armorClass: 8,
                 damage: 3,
                 weaponDamage: 6, // d6
+                penetration: 1, // Basic weapon (sword)
                 exp: 15,
                 minDepth: 4,
                 maxDepth: 10
@@ -340,6 +368,7 @@ class Monster {
                 armorClass: 9,
                 damage: 3,
                 weaponDamage: 8, // d8
+                penetration: 2, // Quality weapon (polearm)
                 exp: 18,
                 minDepth: 5,
                 maxDepth: 11
@@ -353,6 +382,7 @@ class Monster {
                 armorClass: 8,
                 damage: 4,
                 weaponDamage: 6, // d6 claw
+                penetration: 0, // Claws/natural attack
                 exp: 22,
                 minDepth: 5,
                 maxDepth: 12
@@ -366,6 +396,7 @@ class Monster {
                 armorClass: 7,
                 damage: 4,
                 weaponDamage: 8, // d8 bow
+                penetration: 2, // Quality weapon (bow)
                 exp: 20,
                 minDepth: 5,
                 maxDepth: 11
@@ -379,6 +410,7 @@ class Monster {
                 armorClass: 6,
                 damage: 3,
                 weaponDamage: 4, // d4 + drain
+                penetration: 1, // Life drain touch
                 exp: 25,
                 minDepth: 6,
                 maxDepth: 12
@@ -392,6 +424,7 @@ class Monster {
                 armorClass: 11,
                 damage: 2,
                 weaponDamage: 3, // d3 + charm
+                penetration: 0, // Charm (special)
                 exp: 16,
                 minDepth: 4,
                 maxDepth: 10
@@ -405,6 +438,7 @@ class Monster {
                 armorClass: 6,
                 damage: 5,
                 weaponDamage: 8, // d8 horn
+                penetration: 2, // Sharp magical horn
                 exp: 28,
                 minDepth: 6,
                 maxDepth: 13
@@ -418,6 +452,7 @@ class Monster {
                 armorClass: 8,
                 damage: 4,
                 weaponDamage: 6, // d6 invisible
+                penetration: 1, // Invisible attack
                 exp: 24,
                 minDepth: 6,
                 maxDepth: 12
@@ -431,6 +466,7 @@ class Monster {
                 armorClass: 9,
                 damage: 4,
                 weaponDamage: 6, // d6 freeze
+                penetration: 0, // Claws/natural attack
                 exp: 21,
                 minDepth: 5,
                 maxDepth: 11
@@ -446,6 +482,8 @@ class Monster {
                 armorClass: 7,
                 damage: 5,
                 weaponDamage: 8, // d8 club
+                protection: 3, // Thick hide + chain mail
+                penetration: 3, // Massive club
                 exp: 28,
                 minDepth: 7,
                 maxDepth: 15
@@ -459,6 +497,8 @@ class Monster {
                 armorClass: 6,
                 damage: 6,
                 weaponDamage: 6, // d6 claw (multiple attacks)
+                protection: 3, // Thick regenerating hide
+                penetration: 2, // Sharp claws
                 exp: 35,
                 minDepth: 8,
                 maxDepth: 18
@@ -472,6 +512,8 @@ class Monster {
                 armorClass: 5,
                 damage: 7,
                 weaponDamage: 8, // d8 axe
+                protection: 4, // Heavy plate mail
+                penetration: 3, // Great axe
                 exp: 42,
                 minDepth: 9,
                 maxDepth: 20
@@ -485,6 +527,7 @@ class Monster {
                 armorClass: 4,
                 damage: 6,
                 weaponDamage: 6, // d6 + drain
+                penetration: 2, // Life drain bite
                 exp: 45,
                 minDepth: 8,
                 maxDepth: 18
@@ -498,6 +541,7 @@ class Monster {
                 armorClass: 5,
                 damage: 7,
                 weaponDamage: 8, // d8 claw
+                penetration: 2, // Sharp stone claws
                 exp: 38,
                 minDepth: 8,
                 maxDepth: 16
@@ -511,6 +555,7 @@ class Monster {
                 armorClass: 8,
                 damage: 3,
                 weaponDamage: 4, // d4 + rust
+                penetration: 0, // Rusting touch (special)
                 exp: 30,
                 minDepth: 7,
                 maxDepth: 14
@@ -524,6 +569,7 @@ class Monster {
                 armorClass: 4,
                 damage: 8,
                 weaponDamage: 10, // d10 + confuse
+                penetration: 3, // Powerful mandibles
                 exp: 50,
                 minDepth: 9,
                 maxDepth: 18
@@ -537,6 +583,7 @@ class Monster {
                 armorClass: 5,
                 damage: 6,
                 weaponDamage: 8, // d8 invisible
+                penetration: 2, // Invisible surprise attack
                 exp: 40,
                 minDepth: 8,
                 maxDepth: 16
@@ -550,6 +597,7 @@ class Monster {
                 armorClass: 6,
                 damage: 8,
                 weaponDamage: 10, // d10 two heads
+                penetration: 3, // Heavy two-handed weapons
                 exp: 48,
                 minDepth: 9,
                 maxDepth: 17
@@ -565,6 +613,7 @@ class Monster {
                 armorClass: 4,
                 damage: 8,
                 weaponDamage: 10, // d10 bite
+                penetration: 3, // Venomous fangs
                 exp: 55,
                 minDepth: 10,
                 maxDepth: 25
@@ -578,6 +627,7 @@ class Monster {
                 armorClass: 3,
                 damage: 10,
                 weaponDamage: 12, // d12 boulder
+                penetration: 4, // Massive boulder
                 exp: 70,
                 minDepth: 12,
                 maxDepth: 30
@@ -591,6 +641,7 @@ class Monster {
                 armorClass: 2,
                 damage: 12,
                 weaponDamage: 12, // d12 bite
+                penetration: 4, // Powerful dragon fangs
                 exp: 100,
                 minDepth: 15,
                 maxDepth: 99
@@ -604,6 +655,7 @@ class Monster {
                 armorClass: 2,
                 damage: 10,
                 weaponDamage: 8, // d8 + spells
+                penetration: 4, // Magical weapons + spells
                 exp: 90,
                 minDepth: 13,
                 maxDepth: 99
@@ -617,6 +669,7 @@ class Monster {
                 armorClass: 1,
                 damage: 14,
                 weaponDamage: 12, // d12 whip
+                penetration: 4, // Flaming whip
                 exp: 120,
                 minDepth: 16,
                 maxDepth: 99
@@ -630,6 +683,7 @@ class Monster {
                 armorClass: 3,
                 damage: 12,
                 weaponDamage: 10, // d10 + special
+                penetration: 3, // Legendary claws
                 exp: 110,
                 minDepth: 14,
                 maxDepth: 99
@@ -643,6 +697,7 @@ class Monster {
                 armorClass: 4,
                 damage: 8,
                 weaponDamage: 6, // d6 + petrify
+                penetration: 2, // Petrifying gaze + claws
                 exp: 75,
                 minDepth: 11,
                 maxDepth: 20
@@ -656,6 +711,7 @@ class Monster {
                 armorClass: 3,
                 damage: 9,
                 weaponDamage: 8, // d8 + riddle
+                penetration: 2, // Sharp claws + riddle magic
                 exp: 85,
                 minDepth: 12,
                 maxDepth: 25
@@ -669,6 +725,7 @@ class Monster {
                 armorClass: 2,
                 damage: 15,
                 weaponDamage: 12, // d12 swallow
+                penetration: 5, // Massive crushing maw
                 exp: 140,
                 minDepth: 17,
                 maxDepth: 99
@@ -682,6 +739,7 @@ class Monster {
                 armorClass: 2,
                 damage: 13,
                 weaponDamage: 12, // d12 ice
+                penetration: 4, // Massive ice weapons
                 exp: 115,
                 minDepth: 15,
                 maxDepth: 99
@@ -699,6 +757,8 @@ class Monster {
         this.armorClass = stats.armorClass;
         this.damage = stats.damage;
         this.weaponDamage = stats.weaponDamage;
+        this.protection = stats.protection || 0; // Armor/natural protection
+        this.penetration = stats.penetration || 0; // Weapon armor penetration
         this.expValue = stats.exp;
         this.minDepth = stats.minDepth;
         this.maxDepth = stats.maxDepth;
@@ -1231,18 +1291,37 @@ class Monster {
     /**
      * Take damage from an attack (Classic Roguelike)
      */
-    takeDamage(damage) {
+    takeDamage(damage, penetration = 0) {
         // Wake up if sleeping and taking damage
         if (this.isAsleep) {
             this.wakeUp('damage');
         }
         
-        this.hp -= damage;
+        // Calculate damage reduction with minimum damage guarantee (75% max reduction)
+        const naturalProtection = this.protection || 0; // Monster's natural protection
+        const effectiveProtection = Math.max(0, naturalProtection - penetration);
+        const reducedDamage = Math.max(0, damage - effectiveProtection);
+        const minimumDamage = Math.ceil(damage * 0.25); // Guarantee 25% of original damage
+        const finalDamage = Math.max(reducedDamage, minimumDamage);
         
-        // Add HP status to battle log (damage amount shown by attacker)
+        if (window.game && window.game.renderer && (naturalProtection > 0 || penetration > 0)) {
+            const reductionPercent = Math.round((1 - finalDamage / damage) * 100);
+            window.game.renderer.addBattleLogMessage(
+                `${this.name} DR ${naturalProtection} vs AP ${penetration} = ${effectiveProtection} DR (${damage} → ${finalDamage}, ${reductionPercent}% reduced)`, 
+                'defense'
+            );
+        }
+        
+        this.hp -= finalDamage;
+        
+        // Add HP status to battle log (only if damage was actually taken)
         if (window.game && window.game.renderer) {
             const hpDisplay = this.hp <= 0 ? '0' : this.hp;
-            window.game.renderer.addBattleLogMessage(`${this.name}: ${hpDisplay}/${this.maxHp} HP`, 'damage');
+            if (finalDamage > 0) {
+                window.game.renderer.addBattleLogMessage(`${this.name}: ${hpDisplay}/${this.maxHp} HP`, 'damage');
+            } else {
+                window.game.renderer.addBattleLogMessage(`${this.name} takes no damage!`, 'defense');
+            }
         }
         
         if (this.hp <= 0) {
@@ -1288,7 +1367,7 @@ class Monster {
                 window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getMonsterActionSound('MONSTER_ATTACK'));
             }
             
-            return player.takeDamage(finalDamage);
+            return player.takeDamage(finalDamage, this.penetration || 0);
         } else {
             // Miss
             if (window.game && window.game.renderer) {
@@ -1368,7 +1447,7 @@ class MonsterSpawner {
                 const packPositions = this.generatePackPositions(room, actualPackSize, packBehavior.spacing);
                 
                 if (packPositions.length > 0) {
-                    console.log(`Spawning ${packBehavior.type} of ${actualPackSize} ${monsterType}(s) in room`);
+            
                     
                     packPositions.forEach(position => {
                         if (!this.getMonsterAt(position.x, position.y)) {
@@ -1408,7 +1487,7 @@ class MonsterSpawner {
         }
         
         this.monsters.push(monster);
-        console.log(`Spawned ${monster.name} at (${x}, ${y}) [Depth ${currentDepth}]`);
+
     }
     
     /**
@@ -1492,7 +1571,7 @@ class MonsterSpawner {
         
         // Fallback to kobold if no monsters available (shouldn't happen)
         if (availableTypes.length === 0) {
-            console.warn(`No monsters available for depth ${currentDepth}, using kobold`);
+
             return 'kobold';
         }
         

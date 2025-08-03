@@ -105,6 +105,11 @@ class Player {
         this.inventory = [];
         this.maxInventorySize = 26; // A-Z for inventory slots
         
+        // Penetration & Protection system (Warhammer-style)
+        this.penetration = 0; // Player's weapon penetration
+        this.totalProtection = 0; // Total protection from all armor
+        this.blockChance = 0; // Shield block chance percentage
+        
         // Calculate initial HP/MP based on ability scores
         this.calculateInitialStats();
         
@@ -160,14 +165,8 @@ class Player {
         this.maxMp = Math.max(0, intModifier);
         this.mp = this.maxMp;
         
-        // WARRIOR TEST BUILD logging
-        console.log(`🛡️ Warrior Stats Calculated:`);
-        console.log(`HP: ${this.hp}/${this.maxHp} (CON mod: +${conModifier})`);
-        console.log(`DEX: ${this.dexterity}, DEX mod: ${this.getClassicModifier(this.dexterity)}`);
-        console.log(`AC: ${this.armorClass} (10 - DEX mod ${this.getClassicModifier(this.dexterity)})`);
-        console.log(`To Hit: +${this.toHit} (STR mod: +${this.getClassicModifier(this.strength)} + Level ${this.level})`);
-        console.log(`Damage: +${this.damage} (STR mod), Weapon: ${this.weaponDamage}`);
-        console.log(`Weight Capacity: ${this.currentWeight}/${this.maxWeight} lbs`);
+
+
     }
     
     /**
@@ -236,16 +235,16 @@ class Player {
         const doorState = dungeon.getDoorState(x, y);
         
         if (doorState === 'open') {
-                    // Walk through open door
-        this.moveTo(x, y);
-        if (window.game && window.game.renderer) {
-            window.game.renderer.addLogMessage('You walk through the open door.');
-        }
+            // Walk through open door
+            this.moveTo(x, y);
+            if (window.game && window.game.renderer) {
+                window.game.renderer.addLogMessage('You walk through the open door.');
+            }
         // Generate movement sound
         if (window.game && window.game.noiseSystem) {
             window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getPlayerActionSound('MOVE'));
         }
-        return true;
+            return true;
         } else if (doorState === 'closed') {
             // Try to open closed door
             return this.openDoor(x, y, dungeon);
@@ -296,7 +295,7 @@ class Player {
                 const requiredRoll = monster.armorClass - this.toHit; // THAC0 calculation
                 
                 if (window.game && window.game.renderer) {
-                    window.game.renderer.addBattleLogMessage(`You slam the door on ${monster.name}... (${naturalRoll} vs ${requiredRoll}+ needed, AC ${monster.armorClass})`);
+                    window.game.renderer.addBattleLogMessage(`You slam the door on ${monster.name}... (${naturalRoll} vs ${requiredRoll}+ needed, AC ${monster.armorClass}) [Door AP 5]`);
                 }
                 
                 if (naturalRoll >= requiredRoll) {
@@ -308,15 +307,17 @@ class Player {
                     if (naturalRoll === 20) {
                         finalDamage = doorDamage * 2;
                         if (window.game && window.game.renderer) {
-                            window.game.renderer.addBattleLogMessage(`Critical door slam! ${finalDamage} damage!`, 'victory');
+                            window.game.renderer.addBattleLogMessage(`Critical door slam! ${finalDamage} damage! [AP 5]`, 'victory');
                         }
                     } else {
                         if (window.game && window.game.renderer) {
-                            window.game.renderer.addBattleLogMessage(`The door crushes for ${finalDamage} damage!`);
+                            window.game.renderer.addBattleLogMessage(`The door crushes for ${finalDamage} damage! [AP 5]`);
                         }
                     }
                     
-                    monster.takeDamage(finalDamage);
+                    // Door slam has high penetration (heavy doors crush armor)
+                    const doorPenetration = 5; // High AP - doors can crush through heavy armor
+                    monster.takeDamage(finalDamage, doorPenetration);
                     
                     if (!monster.isAlive) {
                         if (window.game && window.game.renderer) {
@@ -357,16 +358,16 @@ class Player {
             }
             
             // No monster, close normally
-                    if (dungeon.setDoorState(x, y, 'closed')) {
-            if (window.game && window.game.renderer) {
-                window.game.renderer.addLogMessage('You close the door.');
-            }
+            if (dungeon.setDoorState(x, y, 'closed')) {
+                if (window.game && window.game.renderer) {
+                    window.game.renderer.addLogMessage('You close the door.');
+                }
             // Generate door closing sound
             if (window.game && window.game.noiseSystem) {
                 window.game.noiseSystem.makeSound(x, y, window.game.noiseSystem.getPlayerActionSound('DOOR_CLOSE'));
             }
-            return true; // Turn consumed
-        }
+                return true; // Turn consumed
+            }
         } else if (doorState === 'closed') {
             if (window.game && window.game.renderer) {
                 window.game.renderer.addLogMessage('The door is already closed.');
@@ -402,23 +403,31 @@ class Player {
             // Add 1 healing potion
             const healingPotion = EquipmentManager.createEquipment('potions', 'healingPotion');
             if (healingPotion) {
+                console.log(`Starting potion created: ${healingPotion.name}, healDice: ${healingPotion.healDice}, healAmount: ${healingPotion.healAmount}`);
                 this.addToInventory(healingPotion);
+            } else {
+                console.warn('Failed to create starting healing potion');
             }
             
-            console.log('🎯 BASIC STARTING SETUP 🎯');
-            console.log('Level: 1');
-            console.log('Equipment: Dagger only');
-            console.log('Items: 1 food ration, 1 healing potion');
+            
         } else {
             console.error('EquipmentManager not available - falling back to basic items');
             // Fallback to basic items if EquipmentManager is not loaded
-            this.addToInventory({
+            // Create proper EquipmentItem with healDice for dice-based healing
+            const fallbackPotion = new EquipmentItem('Basic Healing Potion', {
                 name: 'Basic Healing Potion',
                 type: 'potion',
-                healAmount: 10,
+                healDice: '2d4+2', // Use dice-based healing instead of fixed
+                healAmount: 10, // Fallback for compatibility
                 weight: 8,
-                description: 'A basic healing potion.'
+                symbol: '!',
+                color: '#FF0000',
+                description: 'A basic healing potion. (2d4+2 HP)',
+                stackable: true,
+                maxStackSize: 99
             });
+            console.log(`Fallback potion created: ${fallbackPotion.name}, healDice: ${fallbackPotion.healDice}, healAmount: ${fallbackPotion.healAmount}`);
+            this.addToInventory(fallbackPotion);
         }
     }
     
@@ -447,15 +456,57 @@ class Player {
     /**
      * Take damage from an attack (Classic Roguelike)
      */
-    takeDamage(damage) {
+    takeDamage(damage, penetration = 0) {
+        // Calculate damage reduction with minimum damage guarantee (75% max reduction)
+        const effectiveProtection = Math.max(0, this.totalProtection - penetration);
+        const reducedDamage = Math.max(0, damage - effectiveProtection);
+        const minimumDamage = Math.ceil(damage * 0.25); // Guarantee 25% of original damage
+        let finalDamage = Math.max(reducedDamage, minimumDamage);
+        
+        if (window.game && window.game.renderer && (this.totalProtection > 0 || penetration > 0)) {
+            const reductionPercent = Math.round((1 - finalDamage / damage) * 100);
+            window.game.renderer.addBattleLogMessage(
+                `DR ${this.totalProtection} vs AP ${penetration} = ${effectiveProtection} DR (${damage} → ${finalDamage}, ${reductionPercent}% reduced)`, 
+                'defense'
+            );
+        }
+        
+        // Shield Block Chance check (after damage reduction calculation)
+        const blockChance = this.getBlockChance();
+        if (blockChance > 0 && finalDamage > 0) {
+            const blockRoll = Math.floor(Math.random() * 100) + 1; // 1-100
+            if (blockRoll <= blockChance) {
+                // Successful block!
+        if (window.game && window.game.renderer) {
+                    window.game.renderer.addBattleLogMessage(
+                        `You block the attack with your shield! (${blockRoll} ≤ ${blockChance}% BC)`, 
+                        'victory'
+                    );
+                }
+                finalDamage = 0; // Completely blocked
+            } else {
+                // Failed block
+                if (window.game && window.game.renderer && blockChance > 0) {
+                    window.game.renderer.addBattleLogMessage(
+                        `Block failed! (${blockRoll} > ${blockChance}% BC)`, 
+                        'normal'
+                    );
+                }
+            }
+        }
+        
         const oldHpPercent = this.hp / this.maxHp;
-        this.hp -= damage;
+        this.hp -= finalDamage;
         const newHpPercent = this.hp / this.maxHp;
         
-        // Add HP status to battle log (damage amount shown by attacker)
+        // Add HP status to battle log (only if damage was actually taken)
         if (window.game && window.game.renderer) {
             const hpDisplay = this.hp <= 0 ? '0' : this.hp;
-            window.game.renderer.addBattleLogMessage(`You: ${hpDisplay}/${this.maxHp} HP`, 'damage');
+            if (finalDamage > 0) {
+                window.game.renderer.addBattleLogMessage(`You: ${hpDisplay}/${this.maxHp} HP`, 'damage');
+            } else {
+                window.game.renderer.addBattleLogMessage('No damage taken!', 'defense');
+            }
         }
         
         if (this.hp <= 0) {
@@ -512,7 +563,7 @@ class Player {
                 }
             }
             
-            monster.takeDamage(finalDamage);
+            monster.takeDamage(finalDamage, this.penetration);
             
             if (!monster.isAlive) {
                 if (window.game && window.game.renderer) {
@@ -571,7 +622,7 @@ class Player {
             this.updateCombatStats();
         }
         
-        console.log(`You heal ${healedAmount} HP! HP: ${this.hp}/${this.maxHp}`);
+        
         return healedAmount;
     }
     
@@ -614,8 +665,7 @@ class Player {
         // Update derived stats with equipment
         this.updateCombatStats();
         
-        console.log(`Level up! You are now level ${this.level}!`);
-        console.log(`HP increased by ${hpIncrease}, MP increased by ${mpIncrease}`);
+        
     }
     
 
@@ -629,7 +679,7 @@ class Player {
             return false;
         }
         
-        console.log('You wait.');
+
         this.turnCount++;
         
         // Resting consumes minimal nutrition (NetHack: waiting uses no extra nutrition)
@@ -702,13 +752,13 @@ class Player {
             
             if (healAmount > 0) {
                 const healedAmount = this.heal(healAmount);
-                if (healedAmount > 0) {
-                    this.lastRegenTurn = this.turnCount;
-                    
-                    // Add to battle log
-                    if (window.game && window.game.renderer) {
-                        window.game.renderer.addBattleLogMessage(`You feel better. (+${healedAmount} HP)`, 'heal');
-                    }
+            if (healedAmount > 0) {
+                this.lastRegenTurn = this.turnCount;
+                
+                // Add to battle log
+                if (window.game && window.game.renderer) {
+                    window.game.renderer.addBattleLogMessage(`You feel better. (+${healedAmount} HP)`, 'heal');
+                }
                 }
             } else {
                 // Still update timer even if no healing occurred
@@ -734,15 +784,16 @@ class Player {
             this.equipment.weapon = EquipmentManager.createEquipment('weapons', 'dagger');
         } else {
             // Fallback if EquipmentManager not available
-            this.equipment.weapon = {
-                name: 'Dagger',
-                type: 'weapon',
-                damage: 1,
-                weaponDamage: 4, // d4
-                toHitBonus: 0,
+        this.equipment.weapon = {
+            name: 'Dagger',
+            type: 'weapon',
+            damage: 1,
+            weaponDamage: 4, // d4
+            toHitBonus: 0,
+                penetration: 1, // Light armor piercing
                 weight: 10, // Light starting weapon
-                description: 'A simple iron dagger. Better than bare hands.'
-            };
+                description: 'A simple iron dagger. Better than bare hands. (1d4+1 damage, AP 1)'
+        };
         }
         
         // Option 2: True hardcore - start unarmed (uncomment below for maximum difficulty)
@@ -786,14 +837,28 @@ class Player {
         this.minDamage = this.baseDamage + 1; // Min possible (dice roll 1)
         this.maxDamage = this.baseDamage + this.weaponDamage; // Max possible (max dice roll)
         
+        // Calculate weapon penetration
+        this.penetration = 0;
+        if (this.equipment.weapon && this.equipment.weapon.penetration) {
+            this.penetration = this.equipment.weapon.penetration;
+        }
+        // Add penetration from accessories
+        if (this.equipment.ring && this.equipment.ring.penetration) {
+            this.penetration += this.equipment.ring.penetration;
+        }
+        if (this.equipment.amulet && this.equipment.amulet.penetration) {
+            this.penetration += this.equipment.amulet.penetration;
+        }
+        
         // Apply armor bonuses (SUBTRACT from AC - lower is better)
         if (this.equipment.armor && this.equipment.armor.armorClassBonus) {
             this.armorClass -= this.equipment.armor.armorClassBonus; // Lower AC is better
         }
         
-        if (this.equipment.shield && this.equipment.shield.armorClassBonus) {
-            this.armorClass -= this.equipment.shield.armorClassBonus;
-        }
+        // Shields don't provide AC bonus (only BC)
+        // if (this.equipment.shield && this.equipment.shield.armorClassBonus) {
+        //     this.armorClass -= this.equipment.shield.armorClassBonus;
+        // }
         
         if (this.equipment.helmet && this.equipment.helmet.armorClassBonus) {
             this.armorClass -= this.equipment.helmet.armorClassBonus;
@@ -801,6 +866,7 @@ class Player {
         
         if (this.equipment.gloves) {
             this.baseToHit += this.equipment.gloves.toHitBonus || 0;
+            this.armorClass -= this.equipment.gloves.armorClassBonus || 0;
         }
         
         if (this.equipment.boots) {
@@ -815,6 +881,37 @@ class Player {
         if (this.equipment.amulet) {
             this.baseToHit += this.equipment.amulet.toHitBonus || 0;
             this.armorClass -= this.equipment.amulet.armorClassBonus || 0;
+        }
+        
+        // Calculate total protection from all armor (Warhammer-style)
+        this.totalProtection = 0;
+        if (this.equipment.armor && this.equipment.armor.protection) {
+            this.totalProtection += this.equipment.armor.protection;
+        }
+        // Shields don't provide DR protection (only BC)
+        // if (this.equipment.shield && this.equipment.shield.protection) {
+        //     this.totalProtection += this.equipment.shield.protection;
+        // }
+        if (this.equipment.helmet && this.equipment.helmet.protection) {
+            this.totalProtection += this.equipment.helmet.protection;
+        }
+        if (this.equipment.gloves && this.equipment.gloves.protection) {
+            this.totalProtection += this.equipment.gloves.protection;
+        }
+        if (this.equipment.boots && this.equipment.boots.protection) {
+            this.totalProtection += this.equipment.boots.protection;
+        }
+        if (this.equipment.ring && this.equipment.ring.protection) {
+            this.totalProtection += this.equipment.ring.protection;
+        }
+        if (this.equipment.amulet && this.equipment.amulet.protection) {
+            this.totalProtection += this.equipment.amulet.protection;
+        }
+        
+        // Update block chance from shield
+        this.blockChance = 0;
+        if (this.equipment.shield && this.equipment.shield.blockChance) {
+            this.blockChance = this.equipment.shield.blockChance;
         }
         
         // Recalculate final to-hit after all equipment bonuses
@@ -922,19 +1019,19 @@ class Player {
         // If we get here, either the item isn't stackable, or there's leftover quantity
         if (item.quantity > 0) {
             // Check if we have space for a new inventory slot
-            if (this.inventory.length >= this.maxInventorySize) {
-                if (window.game && window.game.renderer) {
-                    window.game.renderer.addBattleLogMessage('Your pack is full!', 'normal');
-                }
-                return false;
+        if (this.inventory.length >= this.maxInventorySize) {
+            if (window.game && window.game.renderer) {
+                window.game.renderer.addBattleLogMessage('Your pack is full!', 'normal');
             }
+            return false;
+        }
             
             // Add the remaining items as a new stack
-
-            this.inventory.push(item);
+        
+        this.inventory.push(item);
             this.updateCurrentWeight();
-            
-            if (window.game && window.game.renderer) {
+        
+        if (window.game && window.game.renderer) {
                 const message = item.quantity === 1 ? 
                     `You pick up ${item.name}.` : 
                     `You pick up ${item.quantity} ${item.name}.`;
@@ -1026,9 +1123,62 @@ class Player {
             const totalWeight = item.getTotalWeight ? item.getTotalWeight() : (item.weight * (item.quantity || 1));
             const weightText = totalWeight === 1 ? '1 lb' : `${totalWeight} lbs`;
             
+            // Add stats for equipment items
+            let statsText = '';
+            if (item.type === 'weapon' && item.damage) {
+                const weaponDamage = item.weaponDamage || item.damage || '?';
+                const apText = item.penetration ? `, AP ${item.penetration}` : '';
+                statsText = ` [${item.damage}+d${weaponDamage}${apText}]`;
+            } else if (item.type === 'armor' && item.armorClassBonus) {
+                const protectionText = item.protection ? `, DR ${item.protection}` : '';
+                statsText = ` [AC -${item.armorClassBonus}${protectionText}]`;
+            } else if (item.type === 'shield' && item.blockChance) {
+                statsText = ` [BC ${item.blockChance}%]`;
+            } else if (item.type === 'helmet' && item.armorClassBonus) {
+                const protectionText = item.protection ? `, DR ${item.protection}` : '';
+                statsText = ` [AC -${item.armorClassBonus}${protectionText}]`;
+            } else if (item.type === 'gloves') {
+                const stats = [];
+                if (item.armorClassBonus) stats.push(`AC -${item.armorClassBonus}`);
+                if (item.toHitBonus) stats.push(`To Hit ${item.toHitBonus >= 0 ? '+' : ''}${item.toHitBonus}`);
+                if (item.protection) stats.push(`DR ${item.protection}`);
+                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
+            } else if (item.type === 'boots' && item.armorClassBonus) {
+                const protectionText = item.protection ? `, DR ${item.protection}` : '';
+                statsText = ` [AC -${item.armorClassBonus}${protectionText}]`;
+            } else if (item.type === 'ring') {
+                const stats = [];
+                if (item.armorClassBonus) stats.push(`AC -${item.armorClassBonus}`);
+                if (item.toHitBonus) stats.push(`To Hit ${item.toHitBonus >= 0 ? '+' : ''}${item.toHitBonus}`);
+                if (item.protection) stats.push(`DR ${item.protection}`);
+                if (item.penetration) stats.push(`AP ${item.penetration}`);
+                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
+            } else if (item.type === 'amulet') {
+                const stats = [];
+                if (item.armorClassBonus) stats.push(`AC -${item.armorClassBonus}`);
+                if (item.toHitBonus) stats.push(`To Hit ${item.toHitBonus >= 0 ? '+' : ''}${item.toHitBonus}`);
+                if (item.protection) stats.push(`DR ${item.protection}`);
+                if (item.penetration) stats.push(`AP ${item.penetration}`);
+                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
+            } else if (item.type === 'potion') {
+                const healStats = [];
+                if (item.healDice) {
+                    healStats.push(`Heal: ${item.healDice} HP`);
+                } else if (item.healAmount > 0) {
+                    healStats.push(`Heal: ${item.healAmount} HP`);
+                }
+                if (healStats.length > 0) statsText = ` [${healStats.join(', ')}]`;
+            } else if (item.type === 'food') {
+                const foodStats = [];
+                if (item.nutrition) foodStats.push(`Nutrition: ${item.nutrition}`);
+                if (item.healAmount > 0) foodStats.push(`Heal: ${item.healAmount} HP`);
+                if (item.perishable) foodStats.push('Perishable');
+                if (foodStats.length > 0) statsText = ` [${foodStats.join(', ')}]`;
+            }
+            
             const itemText = isEquipped ? 
-                `${letter} - ${displayName} (${weightText}) (being worn)` : 
-                `${letter} - ${displayName} (${weightText})`;
+                `${letter} - ${displayName}${statsText} (${weightText}) (being worn)` : 
+                `${letter} - ${displayName}${statsText} (${weightText})`;
             summary.push(itemText);
         });
         return summary;
@@ -1087,17 +1237,34 @@ class Player {
             // Store current item for later inventory management
             const currentItem = this.equipment[slot];
             
+            // Check two-handed weapon and shield conflicts
+            if (item.type === 'weapon' && item.category === 'two_handed' && this.equipment['shield']) {
+                // Two-handed weapon conflicts with shield - remove shield first
+                const shieldItem = this.equipment['shield'];
+                this.equipment['shield'] = null;
+                this.addToInventory(shieldItem);
+                if (window.game && window.game.renderer) {
+                    window.game.renderer.addBattleLogMessage(`You remove ${shieldItem.name} to wield the two-handed weapon.`, 'normal');
+                }
+            } else if (item.type === 'shield' && this.equipment['weapon'] && this.equipment['weapon'].category === 'two_handed') {
+                // Shield conflicts with two-handed weapon - cannot equip
+                if (window.game && window.game.renderer) {
+                    window.game.renderer.addBattleLogMessage('You cannot use a shield while wielding a two-handed weapon.', 'normal');
+                }
+                return false;
+            }
+            
             // Remove from inventory first
-            const index = letter.charCodeAt(0) - 97; // Use 97 for lowercase 'a'
-            this.removeFromInventory(index);
+        const index = letter.charCodeAt(0) - 97; // Use 97 for lowercase 'a'
+        this.removeFromInventory(index);
             
             // Directly swap equipment without intermediate updateCombatStats calls
             this.equipment[slot] = item;
-            
-            // Add old item back to inventory if there was one
-            if (currentItem) {
-                this.addToInventory(currentItem);
-            }
+        
+        // Add old item back to inventory if there was one
+        if (currentItem) {
+            this.addToInventory(currentItem);
+        }
             
             // Update combat stats once after all changes are complete
             this.updateCombatStats();
@@ -1113,12 +1280,12 @@ class Player {
                     window.game.renderer.addBattleLogMessage(`You equip ${item.name}.`, 'normal');
                 }
             }
-            
-            // Consume a turn for equipment change
-            this.turnCount++;
-            this.checkRegeneration();
-            
-            return true;
+        
+        // Consume a turn for equipment change
+        this.turnCount++;
+        this.checkRegeneration();
+        
+        return true;
         } finally {
             // Unlock UI updates
             this._equipmentChanging = false;
@@ -1139,7 +1306,7 @@ class Player {
                 this.equipment[slot] = null;
                 
                 // Add to inventory
-                this.addToInventory(item);
+            this.addToInventory(item);
                 
                 // Update combat stats once after all changes are complete
                 this.updateCombatStats();
@@ -1149,12 +1316,12 @@ class Player {
                 if (window.game && window.game.renderer) {
                     window.game.renderer.addBattleLogMessage(`You remove ${item.name}.`, 'normal');
                 }
-                
-                // Consume a turn for equipment change
-                this.turnCount++;
-                this.checkRegeneration();
-                
-                return true;
+            
+            // Consume a turn for equipment change
+            this.turnCount++;
+            this.checkRegeneration();
+            
+            return true;
             } finally {
                 // Unlock UI updates
                 this._equipmentChanging = false;
@@ -1661,13 +1828,20 @@ class Player {
         let healAmount = 0;
         let diceRoll = null;
         
+        // Debug: Log potion properties
+        console.log(`Drinking potion: ${potionItem.name}, healDice: ${potionItem.healDice}, healAmount: ${potionItem.healAmount}`);
+        
         if (potionItem.healDice) {
             // Use dice-based healing
             healAmount = rollDice(potionItem.healDice);
             diceRoll = potionItem.healDice;
+            console.log(`Used healDice: ${diceRoll} → ${healAmount} HP`);
         } else if (potionItem.healAmount) {
             // Fallback to fixed amount
             healAmount = potionItem.healAmount;
+            console.log(`Used healAmount (fallback): ${healAmount} HP`);
+        } else {
+            console.warn(`Potion has no healing properties:`, potionItem);
         }
         
         let oldHp = this.hp;
@@ -1864,6 +2038,13 @@ class Player {
     }
     
     /**
+     * Get current block chance from equipment
+     */
+    getBlockChance() {
+        return this.blockChance || 0;
+    }
+    
+    /**
      * Get player stats summary
      */
     getStats() {
@@ -1905,7 +2086,10 @@ class Player {
             constitution: this.constitution,
             intelligence: this.intelligence,
             wisdom: this.wisdom,
-            charisma: this.charisma
+            charisma: this.charisma,
+            penetration: this.penetration, // Weapon armor penetration (AP)
+            totalProtection: this.totalProtection, // Total damage reduction (DR)
+            blockChance: this.blockChance // Shield block chance (BC)
         };
     }
     

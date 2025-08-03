@@ -105,10 +105,7 @@ class NoiseSystem {
         if (Math.random() < wakeupChance) {
             monster.wakeUp('noise');
             
-            // Debug logging (can be removed in production)
-            if (window.game && window.game.renderer && this.game.debugMode) {
-                console.log(`${monster.name} woke up from noise (${Math.round(wakeupChance * 100)}% chance, level ${soundLevel}, distance ${distance})`);
-            }
+            
         }
     }
     

@@ -315,15 +315,14 @@ class FOV {
                 savedState.exploredTiles.forEach(tileKey => {
                     this.exploredTiles.add(tileKey);
                 });
-                console.log(`FOV state restored: ${savedState.exploredTiles.length} explored tiles`);
-                console.log(`Sample explored tiles: ${savedState.exploredTiles.slice(0, 5).join(', ')}${savedState.exploredTiles.length > 5 ? '...' : ''}`);
+                
             }
             if (savedState.viewRange !== undefined) {
                 this.viewRange = savedState.viewRange;
-                console.log(`FOV view range restored: ${this.viewRange}`);
+    
             }
         } else {
-            console.log('No FOV state to restore, starting fresh');
+
         }
         
         // Clear visible tiles (will be recalculated)

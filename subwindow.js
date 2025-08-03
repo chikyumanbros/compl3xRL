@@ -152,7 +152,7 @@ class SubWindow {
         nameDiv.style.fontWeight = 'bold';
         nameDiv.style.color = '#ffffff';
         nameDiv.style.marginBottom = '10px';
-        nameDiv.textContent = item.getDisplayName();
+        nameDiv.textContent = item.getDisplayName ? item.getDisplayName() : item.name;
         this.content.appendChild(nameDiv);
         
         // Description
@@ -182,15 +182,38 @@ class SubWindow {
         if (item.value) properties.push(`Value: ${item.value} gold`);
         if (item.material) properties.push(`Material: ${item.material}`);
         
+        // Category and weapon type information
+        if (item.category && item.getCategoryDisplayName) {
+            try {
+                properties.push(`Category: ${item.getCategoryDisplayName()}`);
+            } catch (e) {
+                console.warn('Error getting category display name:', e);
+            }
+        }
+        if (item.weaponType && item.getWeaponTypeDisplayName) {
+            try {
+                const weaponTypeName = item.getWeaponTypeDisplayName();
+                if (weaponTypeName) {
+                    properties.push(`Weapon Type: ${weaponTypeName}`);
+                }
+            } catch (e) {
+                console.warn('Error getting weapon type display name:', e);
+            }
+        }
+        
         // Type-specific properties
         if (item.type === 'weapon') {
             if (item.damage && item.weaponDamage) {
                 properties.push(`Damage: 1d${item.weaponDamage}+${item.damage}`);
             }
-            if (item.toHitBonus) properties.push(`To Hit: +${item.toHitBonus}`);
-        } else if (item.type === 'armor' || item.type === 'shield') {
-            // Unified AC display for all armor/shield items
+            if (item.toHitBonus) properties.push(`To Hit: ${item.toHitBonus >= 0 ? '+' : ''}${item.toHitBonus}`);
+            if (item.penetration) properties.push(`Penetration: AP ${item.penetration}`);
+        } else if (item.type === 'armor') {
             if (item.armorClassBonus) properties.push(`AC -${item.armorClassBonus}`);
+            if (item.protection) properties.push(`DR: ${item.protection}`);
+        } else if (item.type === 'shield') {
+            // Shields only provide Block Chance
+            if (item.blockChance) properties.push(`Block Chance: ${item.blockChance}%`);
         } else if (item.type === 'potion') {
             if (item.healDice) properties.push(`Healing: ${item.healDice} HP`);
             else if (item.healAmount) properties.push(`Healing: ${item.healAmount} HP`);
@@ -244,18 +267,20 @@ class SubWindow {
     showEquipment(player) {
         this.title.textContent = 'Equipment';
         this.content.innerHTML = '';
-        this.input.style.display = 'none';
+        this.input.style.display = 'flex';
+        this.textInput.placeholder = 'Enter slot key for details, w to wear/wield, T to take off, ESC to close';
+        this.textInput.value = '';
         
         const equipment = player.equipment;
         const equipmentSlots = [
-            { key: 'weapon', name: 'Weapon', keyHint: '' },
-            { key: 'armor', name: 'Armor', keyHint: '' },
-            { key: 'shield', name: 'Shield', keyHint: '' },
-            { key: 'helmet', name: 'Helmet', keyHint: '' },
-            { key: 'gloves', name: 'Gloves', keyHint: '' },
-            { key: 'boots', name: 'Boots', keyHint: '' },
-            { key: 'ring', name: 'Ring', keyHint: '' },
-            { key: 'amulet', name: 'Amulet', keyHint: '' }
+            { key: 'weapon', name: 'Weapon', keyHint: '(w)', letter: 'w' },
+            { key: 'armor', name: 'Armor', keyHint: '(a)', letter: 'a' },
+            { key: 'shield', name: 'Shield', keyHint: '(s)', letter: 's' },
+            { key: 'helmet', name: 'Helmet', keyHint: '(h)', letter: 'h' },
+            { key: 'gloves', name: 'Gloves', keyHint: '(g)', letter: 'g' },
+            { key: 'boots', name: 'Boots', keyHint: '(b)', letter: 'b' },
+            { key: 'ring', name: 'Ring', keyHint: '(r)', letter: 'r' },
+            { key: 'amulet', name: 'Amulet', keyHint: '(m)', letter: 'm' }
         ];
         
         equipmentSlots.forEach(slot => {
@@ -268,10 +293,18 @@ class SubWindow {
                 let statsText = '';
                 if (item.damage) {
                     const weaponDamage = item.weaponDamage || item.damage || '?';
-                    statsText = ` (${item.damage}+d${weaponDamage})`;
+                    const apText = item.penetration ? `, AP ${item.penetration}` : '';
+                    statsText = ` (${item.damage}+d${weaponDamage}${apText})`;
                 } else if (item.armorClassBonus) {
-                    // Unified AC display for all armor/shield items
-                    statsText = ` (AC -${item.armorClassBonus})`;
+                    if (item.type === 'shield') {
+                        // Shields only show BC
+                        const blockText = item.blockChance ? `BC ${item.blockChance}%` : '';
+                        statsText = ` (${blockText})`;
+                    } else {
+                        // Other armor shows AC and DR
+                        const protectionText = item.protection ? `, DR ${item.protection}` : '';
+                        statsText = ` (AC -${item.armorClassBonus}${protectionText})`;
+                    }
                 }
                 slotDiv.innerHTML = `<span style="color: #00ff00;">${slot.name} ${slot.keyHint}:</span> ${item.name}${statsText}`;
             } else {
@@ -286,8 +319,167 @@ class SubWindow {
         helpDiv.style.marginTop = '10px';
         helpDiv.style.color = '#808080';
         helpDiv.style.fontSize = '0.9em';
-        helpDiv.innerHTML = 'Press w to wear/wield, T to take off, ESC to close';
+        helpDiv.innerHTML = 'Enter slot key for details<br>Press w to wear/wield, T to take off, ESC to close';
         this.content.appendChild(helpDiv);
+        
+        // Set up callback for equipment slot selection
+        this.callback = (choice) => {
+            if (choice && choice.length === 1) {
+                const input = choice.toLowerCase().trim();
+                
+                // Find equipment slot by letter
+                const slot = equipmentSlots.find(s => s.letter === input);
+                if (slot && equipment[slot.key]) {
+                    this.showEquipmentItemDetails(player, slot.key, equipment[slot.key]);
+                    return false; // Keep window open for details
+                }
+                
+                // Handle other commands
+                if (input === 'w') {
+                    // If weapon slot is empty, show equipment menu
+                    if (!equipment['weapon']) {
+                        this.hide();
+                        setTimeout(() => this.showEquipmentMenu(player), 100);
+                        return true; // Close window
+                    } else {
+                        // Show weapon details if equipped
+                        this.showEquipmentItemDetails(player, 'weapon', equipment['weapon']);
+                        return false; // Keep window open for details
+                    }
+                } else if (input === 't') {
+                    this.hide();
+                    // Trigger take off menu (could be implemented later)
+                    return true; // Close window
+                }
+                
+                // Invalid input, keep window open
+                if (window.game && window.game.renderer) {
+                    window.game.renderer.addLogMessage('Invalid slot key. Use w,a,s,h,g,b,r,m for details.');
+                }
+                return false;
+            }
+            return true; // Close on empty input
+        };
+        
+        this.show();
+        this.textInput.focus();
+    }
+    
+    /**
+     * Show detailed information for an equipped item
+     */
+    showEquipmentItemDetails(player, slotKey, item) {
+        this.title.textContent = `Equipment Details: ${item.name}`;
+        this.content.innerHTML = '';
+        this.input.style.display = 'none';
+        
+        // Item name
+        const nameDiv = document.createElement('div');
+        nameDiv.style.fontSize = '1.1em';
+        nameDiv.style.fontWeight = 'bold';
+        nameDiv.style.color = '#ffffff';
+        nameDiv.style.marginBottom = '10px';
+        nameDiv.textContent = item.getDisplayName ? item.getDisplayName() : item.name;
+        this.content.appendChild(nameDiv);
+        
+        // Equipment slot info
+        const slotDiv = document.createElement('div');
+        slotDiv.style.color = '#00ff00';
+        slotDiv.style.marginBottom = '10px';
+        slotDiv.style.fontWeight = 'bold';
+        const slotNames = {
+            'weapon': 'Weapon',
+            'armor': 'Armor', 
+            'shield': 'Shield',
+            'helmet': 'Helmet',
+            'gloves': 'Gloves',
+            'boots': 'Boots',
+            'ring': 'Ring',
+            'amulet': 'Amulet'
+        };
+        slotDiv.textContent = `Equipped: ${slotNames[slotKey] || slotKey}`;
+        this.content.appendChild(slotDiv);
+        
+        // Description
+        const descDiv = document.createElement('div');
+        descDiv.style.color = '#cccccc';
+        descDiv.style.marginBottom = '15px';
+        descDiv.style.lineHeight = '1.4';
+        descDiv.textContent = item.description || 'No description available.';
+        this.content.appendChild(descDiv);
+        
+        // Properties
+        const propsDiv = document.createElement('div');
+        propsDiv.style.color = '#aaaaaa';
+        propsDiv.style.fontSize = '0.9em';
+        
+        const properties = [];
+        
+        // Basic properties
+        if (item.weight) properties.push(`Weight: ${item.weight}`);
+        if (item.value) properties.push(`Value: ${item.value} gold`);
+        if (item.material) properties.push(`Material: ${item.material}`);
+        
+        // Category and weapon type information
+        if (item.category && item.getCategoryDisplayName) {
+            try {
+                properties.push(`Category: ${item.getCategoryDisplayName()}`);
+            } catch (e) {
+                console.warn('Error getting category display name:', e);
+            }
+        }
+        if (item.weaponType && item.getWeaponTypeDisplayName) {
+            try {
+                const weaponTypeName = item.getWeaponTypeDisplayName();
+                if (weaponTypeName) {
+                    properties.push(`Weapon Type: ${weaponTypeName}`);
+                }
+            } catch (e) {
+                console.warn('Error getting weapon type display name:', e);
+            }
+        }
+        
+        // Type-specific properties
+        if (item.type === 'weapon') {
+            if (item.damage && item.weaponDamage) {
+                properties.push(`Damage: 1d${item.weaponDamage}+${item.damage}`);
+            }
+            if (item.toHitBonus) properties.push(`To Hit: ${item.toHitBonus >= 0 ? '+' : ''}${item.toHitBonus}`);
+            if (item.penetration) properties.push(`Penetration: AP ${item.penetration}`);
+        } else if (item.type === 'armor') {
+            if (item.armorClassBonus) properties.push(`AC -${item.armorClassBonus}`);
+            if (item.protection) properties.push(`DR: ${item.protection}`);
+        } else if (item.type === 'shield') {
+            // Shields only provide Block Chance
+            if (item.blockChance) properties.push(`Block Chance: ${item.blockChance}%`);
+        }
+        
+        // Quality and enchantment
+        if (item.quality && item.quality !== 'normal') {
+            properties.push(`Quality: ${item.quality}`);
+        }
+        if (item.enchantment && item.enchantment !== 0) {
+            properties.push(`Enchantment: ${item.enchantment > 0 ? '+' : ''}${item.enchantment}`);
+        }
+        
+        propsDiv.innerHTML = properties.join('<br>');
+        this.content.appendChild(propsDiv);
+        
+        // Back button
+        const backDiv = document.createElement('div');
+        backDiv.style.marginTop = '15px';
+        backDiv.style.color = '#808080';
+        backDiv.style.fontSize = '0.9em';
+        backDiv.innerHTML = 'Press any key to return to equipment list';
+        this.content.appendChild(backDiv);
+        
+        // Handle any key press to go back
+        const handleKeyPress = (e) => {
+            document.removeEventListener('keydown', handleKeyPress);
+            this.showEquipment(player);
+        };
+        
+        document.addEventListener('keydown', handleKeyPress);
         
         this.show();
     }
@@ -603,7 +795,7 @@ class SubWindow {
                 itemDiv.className = 'item-line';
                 
                 // Display item with quantity if stackable
-                let displayText = item.getDisplayName();
+                let displayText = item.getDisplayName ? item.getDisplayName() : item.name;
                 if (item.stackable && item.quantity > 1) {
                     displayText = `${item.name} (${item.quantity})`;
                 }
@@ -787,7 +979,7 @@ class SubWindow {
                 
                 // Display item with quantity if stackable
                 const inventoryItem = player.inventory[index];
-                let displayText = inventoryItem.getDisplayName();
+                let displayText = inventoryItem.getDisplayName ? inventoryItem.getDisplayName() : inventoryItem.name;
                 if (inventoryItem.stackable && inventoryItem.quantity > 1) {
                     displayText = `${inventoryItem.name} (${inventoryItem.quantity})`;
                 }
@@ -856,7 +1048,7 @@ class SubWindow {
                 
                 // Display item with quantity if stackable
                 const inventoryItem = player.inventory[index];
-                let displayText = inventoryItem.getDisplayName();
+                let displayText = inventoryItem.getDisplayName ? inventoryItem.getDisplayName() : inventoryItem.name;
                 if (inventoryItem.stackable && inventoryItem.quantity > 1) {
                     displayText = `${inventoryItem.name} (${inventoryItem.quantity})`;
                 }
@@ -886,7 +1078,7 @@ class SubWindow {
         // Show item info
         const itemInfo = document.createElement('div');
         itemInfo.className = 'item-line';
-        itemInfo.textContent = `${item.getDisplayName()} - Available: ${item.quantity}`;
+        itemInfo.textContent = `${item.getDisplayName ? item.getDisplayName() : item.name} - Available: ${item.quantity}`;
         this.content.appendChild(itemInfo);
         
         // Show instructions

@@ -40,7 +40,7 @@ class Renderer {
         this.screen.style.fontSize = `${this.fontSize}px`;
         this.screen.style.lineHeight = `${this.fontSize * lineHeightRatio}px`;
         
-        console.log(`Renderer size: ${this.width}x${this.height}, fontSize: ${this.fontSize}px (container: ${containerWidth}x${containerHeight})`);
+
         
         // ASCII symbols for different elements
         this.symbols = {
@@ -308,7 +308,7 @@ class Renderer {
             
             // Enhanced to-hit display with modifiers (always show breakdown)
             const breakdown = stats.toHitBreakdown;
-            let toHitText = `To Hit: +${stats.toHit}`;
+            let toHitText = `To Hit: ${stats.toHit >= 0 ? '+' : ''}${stats.toHit}`;
             
             // Always show breakdown, starting with base
             const breakdownParts = [`${breakdown.base} base`];
@@ -324,6 +324,17 @@ class Renderer {
             document.getElementById('player-tohit').textContent = toHitText;
             
             document.getElementById('player-damage').textContent = `Damage: ${stats.minDamage}-${stats.maxDamage}`;
+            
+            // Display penetration and total protection
+            if (document.getElementById('player-penetration')) {
+                document.getElementById('player-penetration').textContent = `AP: ${stats.penetration || 0}`;
+            }
+            if (document.getElementById('player-protection')) {
+                document.getElementById('player-protection').textContent = `DR: ${stats.totalProtection || 0}`;
+            }
+            if (document.getElementById('player-blockchance')) {
+                document.getElementById('player-blockchance').textContent = `BC: ${stats.blockChance || 0}%`;
+            }
         }
         
         // Update detailed stats
@@ -692,9 +703,10 @@ class Renderer {
             if (equipment.weapon) {
                 const weaponDamage = equipment.weapon.weaponDamage || '?';
                 const baseDamage = equipment.weapon.damage || 0;
+                const apText = equipment.weapon.penetration ? `, AP ${equipment.weapon.penetration}` : '';
                 const enchantDisplay = equipment.weapon.enchantment > 0 ? `+${equipment.weapon.enchantment} ` : 
                                       equipment.weapon.enchantment < 0 ? `${equipment.weapon.enchantment} ` : '';
-                weaponSlot.textContent = `Weapon: ${enchantDisplay}${equipment.weapon.name} (${baseDamage}+d${weaponDamage})`;
+                weaponSlot.textContent = `Weapon: ${enchantDisplay}${equipment.weapon.name} (${baseDamage}+d${weaponDamage}${apText})`;
             } else {
                 weaponSlot.textContent = `Weapon: None (unarmed)`;
             }
@@ -706,9 +718,10 @@ class Renderer {
             if (equipment.armor) {
                 const enchantDisplay = equipment.armor.enchantment > 0 ? `+${equipment.armor.enchantment} ` : 
                                       equipment.armor.enchantment < 0 ? `${equipment.armor.enchantment} ` : '';
-                // Show AC improvement
+                // Show AC improvement and protection
                 const acBonus = equipment.armor.armorClassBonus || 0;
-                armorSlot.textContent = `Armor: ${enchantDisplay}${equipment.armor.name} (AC -${acBonus})`;
+                const protectionText = equipment.armor.protection ? `, DR ${equipment.armor.protection}` : '';
+                armorSlot.textContent = `Armor: ${enchantDisplay}${equipment.armor.name} (AC -${acBonus}${protectionText})`;
             } else {
                 armorSlot.textContent = `Armor: None`;
             }
@@ -720,9 +733,9 @@ class Renderer {
             if (equipment.shield) {
                 const enchantDisplay = equipment.shield.enchantment > 0 ? `+${equipment.shield.enchantment} ` : 
                                       equipment.shield.enchantment < 0 ? `${equipment.shield.enchantment} ` : '';
-                // Show shield AC improvement
-                const acBonus = equipment.shield.armorClassBonus || 0;
-                shieldSlot.textContent = `Shield: ${enchantDisplay}${equipment.shield.name} (AC -${acBonus})`;
+                // Show shield block chance only
+                const blockText = equipment.shield.blockChance ? `BC ${equipment.shield.blockChance}%` : '';
+                shieldSlot.textContent = `Shield: ${enchantDisplay}${equipment.shield.name} (${blockText})`;
             } else {
                 shieldSlot.textContent = `Shield: None`;
             }
@@ -732,7 +745,10 @@ class Renderer {
         const helmetSlot = document.getElementById('helmet-slot');
         if (helmetSlot) {
             if (equipment.helmet) {
-                helmetSlot.textContent = `Helmet: ${equipment.helmet.name} (AC -${equipment.helmet.armorClassBonus})`;
+                const stats = [];
+                if (equipment.helmet.armorClassBonus) stats.push(`AC -${equipment.helmet.armorClassBonus}`);
+                if (equipment.helmet.protection) stats.push(`DR ${equipment.helmet.protection}`);
+                helmetSlot.textContent = `Helmet: ${equipment.helmet.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
             } else {
                 helmetSlot.textContent = `Helmet: None`;
             }
@@ -743,8 +759,9 @@ class Renderer {
         if (glovesSlot) {
             if (equipment.gloves) {
                 const stats = [];
-                if (equipment.gloves.toHitBonus) stats.push(`To Hit +${equipment.gloves.toHitBonus}`);
+                if (equipment.gloves.toHitBonus) stats.push(`To Hit ${equipment.gloves.toHitBonus >= 0 ? '+' : ''}${equipment.gloves.toHitBonus}`);
                 if (equipment.gloves.armorClassBonus) stats.push(`AC -${equipment.gloves.armorClassBonus}`);
+                if (equipment.gloves.protection) stats.push(`DR ${equipment.gloves.protection}`);
                 glovesSlot.textContent = `Gloves: ${equipment.gloves.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
             } else {
                 glovesSlot.textContent = `Gloves: None`;
@@ -757,6 +774,7 @@ class Renderer {
             if (equipment.boots) {
                 const stats = [];
                 if (equipment.boots.armorClassBonus) stats.push(`AC -${equipment.boots.armorClassBonus}`);
+                if (equipment.boots.protection) stats.push(`DR ${equipment.boots.protection}`);
                 bootsSlot.textContent = `Boots: ${equipment.boots.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
             } else {
                 bootsSlot.textContent = `Boots: None`;
@@ -768,8 +786,9 @@ class Renderer {
         if (ringSlot) {
             if (equipment.ring) {
                 const stats = [];
-                if (equipment.ring.toHitBonus) stats.push(`To Hit +${equipment.ring.toHitBonus}`);
+                if (equipment.ring.toHitBonus) stats.push(`To Hit ${equipment.ring.toHitBonus >= 0 ? '+' : ''}${equipment.ring.toHitBonus}`);
                 if (equipment.ring.armorClassBonus) stats.push(`AC -${equipment.ring.armorClassBonus}`);
+                if (equipment.ring.protection) stats.push(`DR ${equipment.ring.protection}`);
                 ringSlot.textContent = `Ring: ${equipment.ring.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
             } else {
                 ringSlot.textContent = `Ring: None`;
@@ -781,8 +800,9 @@ class Renderer {
         if (amuletSlot) {
             if (equipment.amulet) {
                 const stats = [];
-                if (equipment.amulet.toHitBonus) stats.push(`To Hit +${equipment.amulet.toHitBonus}`);
+                if (equipment.amulet.toHitBonus) stats.push(`To Hit ${equipment.amulet.toHitBonus >= 0 ? '+' : ''}${equipment.amulet.toHitBonus}`);
                 if (equipment.amulet.armorClassBonus) stats.push(`AC -${equipment.amulet.armorClassBonus}`);
+                if (equipment.amulet.protection) stats.push(`DR ${equipment.amulet.protection}`);
                 amuletSlot.textContent = `Amulet: ${equipment.amulet.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
             } else {
                 amuletSlot.textContent = `Amulet: None`;
@@ -823,7 +843,7 @@ class Renderer {
      */
     drawItems(items, viewX = 0, viewY = 0, fov = null) {
         if (!items || !Array.isArray(items)) {
-            console.warn('drawItems: items is not a valid array');
+
             return;
         }
         
@@ -832,7 +852,7 @@ class Renderer {
         items.forEach(item => {
             // Safety check for item properties
             if (!item || typeof item.x !== 'number' || typeof item.y !== 'number') {
-                console.warn('drawItems: item has invalid coordinates', item);
+
                 return;
             }
             
@@ -862,7 +882,7 @@ class Renderer {
                     try {
                         visibility = fov.getVisibility(x, y);
                     } catch (error) {
-                        console.warn('FOV error for item at', x, y, error);
+        
                         visibility = { visible: true, explored: true };
                     }
                 }
