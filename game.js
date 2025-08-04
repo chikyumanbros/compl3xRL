@@ -1585,9 +1585,158 @@ class Game {
     }
     
     /**
-     * Move monster towards a target position
+     * Move monster towards a target position with pack coordination (surrounding tactics)
      */
     moveMonsterTowards(monster, targetX, targetY) {
+        // Get all nearby monsters for pack coordination
+        const nearbyMonsters = this.monsterSpawner.getLivingMonsters().filter(m => 
+            m !== monster && !m.isAsleep && !m.isFleeing &&
+            Math.max(Math.abs(m.x - targetX), Math.abs(m.y - targetY)) <= 4 // Within 4 tiles of target
+        );
+        
+        // If there are nearby allies, try pack coordination
+        if (nearbyMonsters.length > 0) {
+            const coordinatedMove = this.calculatePackCoordinatedMove(monster, targetX, targetY, nearbyMonsters);
+            if (coordinatedMove) {
+                this.executeMonsterMove(monster, coordinatedMove.x, coordinatedMove.y);
+                return;
+            }
+        }
+        
+        // Fallback to basic movement logic
+        this.moveMonsterBasic(monster, targetX, targetY);
+    }
+    
+    /**
+     * Calculate coordinated movement for pack tactics (surrounding behavior)
+     */
+    calculatePackCoordinatedMove(monster, targetX, targetY, allies) {
+        const distance = Math.max(Math.abs(monster.x - targetX), Math.abs(monster.y - targetY));
+        
+        // If adjacent to target, stay and attack (no need to move)
+        if (distance === 1) {
+            return null;
+        }
+        
+        // Evaluate surrounding positions around the target
+        const surroundingPositions = this.getSurroundingPositions(targetX, targetY);
+        const occupiedPositions = this.getOccupiedSurroundingPositions(targetX, targetY, allies);
+        
+        // Find best available surrounding position
+        const availablePositions = surroundingPositions.filter(pos => 
+            !occupiedPositions.some(occ => occ.x === pos.x && occ.y === pos.y) &&
+            this.dungeon.isWalkable(pos.x, pos.y) &&
+            !this.monsterSpawner.getMonsterAt(pos.x, pos.y)
+        );
+        
+        if (availablePositions.length === 0) {
+            return null; // No good surrounding positions available
+        }
+        
+        // Choose the closest available surrounding position
+        let bestPosition = null;
+        let minDistance = Infinity;
+        
+        for (const pos of availablePositions) {
+            const distanceToPos = Math.max(Math.abs(monster.x - pos.x), Math.abs(monster.y - pos.y));
+            if (distanceToPos < minDistance) {
+                minDistance = distanceToPos;
+                bestPosition = pos;
+            }
+        }
+        
+        if (!bestPosition) {
+            return null;
+        }
+        
+        // Move towards the chosen surrounding position
+        return this.calculateMoveTowards(monster.x, monster.y, bestPosition.x, bestPosition.y);
+    }
+    
+    /**
+     * Get 8 surrounding positions around target
+     */
+    getSurroundingPositions(centerX, centerY) {
+        const positions = [];
+        const directions = [
+            [-1, -1], [0, -1], [1, -1],
+            [-1,  0],          [1,  0],
+            [-1,  1], [0,  1], [1,  1]
+        ];
+        
+        for (const [dx, dy] of directions) {
+            positions.push({
+                x: centerX + dx,
+                y: centerY + dy,
+                direction: [dx, dy]
+            });
+        }
+        
+        return positions;
+    }
+    
+    /**
+     * Get positions around target that are already occupied by allies
+     */
+    getOccupiedSurroundingPositions(targetX, targetY, allies) {
+        const occupied = [];
+        const surroundingPositions = this.getSurroundingPositions(targetX, targetY);
+        
+        for (const pos of surroundingPositions) {
+            // Check if any ally is at this position or planning to move here
+            const allyAtPosition = allies.find(ally => ally.x === pos.x && ally.y === pos.y);
+            if (allyAtPosition) {
+                occupied.push(pos);
+            }
+        }
+        
+        return occupied;
+    }
+    
+    /**
+     * Calculate next move towards a target position
+     */
+    calculateMoveTowards(fromX, fromY, toX, toY) {
+        const dx = toX - fromX;
+        const dy = toY - fromY;
+        
+        let moveX = 0, moveY = 0;
+        
+        if (dx > 0) moveX = 1;
+        else if (dx < 0) moveX = -1;
+        
+        if (dy > 0) moveY = 1;
+        else if (dy < 0) moveY = -1;
+        
+        // Try diagonal first, then cardinal directions
+        const moves = [];
+        
+        if (moveX !== 0 && moveY !== 0) {
+            moves.push({ x: fromX + moveX, y: fromY + moveY });
+        }
+        if (moveX !== 0) {
+            moves.push({ x: fromX + moveX, y: fromY });
+        }
+        if (moveY !== 0) {
+            moves.push({ x: fromX, y: fromY + moveY });
+        }
+        
+        // Return first valid move
+        for (const move of moves) {
+            if (this.dungeon.isWalkable(move.x, move.y) && 
+                !(move.x === this.player.x && move.y === this.player.y) &&
+                !this.monsterSpawner.getMonsterAt(move.x, move.y)) {
+                return move;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Basic movement logic (fallback when pack coordination fails)
+     */
+    moveMonsterBasic(monster, targetX, targetY) {
         const dx = targetX - monster.x;
         const dy = targetY - monster.y;
         
@@ -1608,14 +1757,7 @@ class Game {
             if (this.dungeon.isWalkable(newX, newY) && 
                 !(newX === this.player.x && newY === this.player.y) &&
                 !this.monsterSpawner.getMonsterAt(newX, newY)) {
-                monster.x = newX;
-                monster.y = newY;
-                
-                // Generate monster movement sound
-                if (this.noiseSystem) {
-                    const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
-                    this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
-                }
+                this.executeMonsterMove(monster, newX, newY);
                 return;
             }
         }
@@ -1628,13 +1770,7 @@ class Game {
             if (this.dungeon.isWalkable(newX, newY) && 
                 !(newX === this.player.x && newY === this.player.y) &&
                 !this.monsterSpawner.getMonsterAt(newX, newY)) {
-                monster.x = newX;
-                
-                // Generate monster movement sound
-                if (this.noiseSystem) {
-                    const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
-                    this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
-                }
+                this.executeMonsterMove(monster, newX, newY);
                 return;
             }
         }
@@ -1647,15 +1783,23 @@ class Game {
             if (this.dungeon.isWalkable(newX, newY) && 
                 !(newX === this.player.x && newY === this.player.y) &&
                 !this.monsterSpawner.getMonsterAt(newX, newY)) {
-                monster.y = newY;
-                
-                // Generate monster movement sound
-                if (this.noiseSystem) {
-                    const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
-                    this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
-                }
+                this.executeMonsterMove(monster, newX, newY);
                 return;
             }
+        }
+    }
+    
+    /**
+     * Execute monster movement and generate sound
+     */
+    executeMonsterMove(monster, newX, newY) {
+        monster.x = newX;
+        monster.y = newY;
+        
+        // Generate monster movement sound
+        if (this.noiseSystem) {
+            const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
+            this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
         }
     }
     
@@ -1684,14 +1828,7 @@ class Game {
                 this.dungeon.isWalkable(newX, newY) && 
                 !(newX === this.player.x && newY === this.player.y) &&
                 !this.monsterSpawner.getMonsterAt(newX, newY)) {
-                monster.x = newX;
-                monster.y = newY;
-                
-                // Generate monster movement sound (fleeing monsters are louder)
-                if (this.noiseSystem) {
-                    const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
-                    this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
-                }
+                this.executeMonsterMove(monster, newX, newY);
                 return;
             }
         }
@@ -1705,13 +1842,7 @@ class Game {
                 this.dungeon.isWalkable(newX, newY) && 
                 !(newX === this.player.x && newY === this.player.y) &&
                 !this.monsterSpawner.getMonsterAt(newX, newY)) {
-                monster.x = newX;
-                
-                // Generate monster movement sound (fleeing monsters are louder)
-                if (this.noiseSystem) {
-                    const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
-                    this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
-                }
+                this.executeMonsterMove(monster, newX, newY);
                 return;
             }
         }
@@ -1725,13 +1856,7 @@ class Game {
                 this.dungeon.isWalkable(newX, newY) && 
                 !(newX === this.player.x && newY === this.player.y) &&
                 !this.monsterSpawner.getMonsterAt(newX, newY)) {
-                monster.y = newY;
-                
-                // Generate monster movement sound (fleeing monsters are louder)
-                if (this.noiseSystem) {
-                    const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
-                    this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
-                }
+                this.executeMonsterMove(monster, newX, newY);
                 return;
             }
         }
@@ -1761,14 +1886,7 @@ class Game {
                 this.dungeon.isWalkable(newX, newY) && 
                 !(newX === this.player.x && newY === this.player.y) &&
                 !this.monsterSpawner.getMonsterAt(newX, newY)) {
-                monster.x = newX;
-                monster.y = newY;
-                
-                // Generate monster movement sound (random movement is often panicked)
-                if (this.noiseSystem) {
-                    const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
-                    this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
-                }
+                this.executeMonsterMove(monster, newX, newY);
                 return;
             }
         }
@@ -1971,14 +2089,7 @@ class Game {
         // Choose randomly among best moves
         if (bestMoves.length > 0) {
             const chosenMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
-                            monster.x = chosenMove.x;
-                monster.y = chosenMove.y;
-                
-                // Generate monster movement sound (evasive movement from cunning monsters)
-                if (this.noiseSystem) {
-                    const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
-                    this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
-                }
+            this.executeMonsterMove(monster, chosenMove.x, chosenMove.y);
         } else {
             // If no good evasive move, fall back to direct fleeing
             this.moveMonsterAwayFrom(monster, playerX, playerY);

@@ -1657,15 +1657,15 @@ class Player {
     }
     
     /**
-     * Calculate weight capacity based on strength (NetHack-style)
+     * Calculate weight capacity based on strength (Generous classic roguelike style)
      */
     calculateWeightCapacity() {
-        // NetHack formula: STR * 25 + 25 (with STR 18 being special)
-        let baseCapacity = this.strength * 25 + 25;
+        // More generous formula: STR * 50 + 100 (allows for proper equipment)
+        let baseCapacity = this.strength * 50 + 100;
         
-        // Special handling for STR 18 (legendary strength)
+        // Special handling for STR 18+ (exceptional strength)
         if (this.strength >= 18) {
-            baseCapacity = 18 * 25 + 25 + (this.strength - 18) * 50; // Extra capacity for exceptional STR
+            baseCapacity = 18 * 50 + 100 + (this.strength - 18) * 100; // Extra capacity for exceptional STR
         }
         
         this.maxWeight = baseCapacity;
@@ -1718,31 +1718,31 @@ class Player {
                     baseWeight = this.getArmorWeight(item);
                     break;
                 case 'shield':
-                    baseWeight = 100; // Heavy shields
+                    baseWeight = 30; // Reasonable shield weight
                     break;
                 case 'helmet':
-                    baseWeight = 30;
+                    baseWeight = 15; // Lighter helmets
                     break;
                 case 'gloves':
-                    baseWeight = 10;
+                    baseWeight = 5; // Very light gloves
                     break;
                 case 'boots':
-                    baseWeight = 50;
+                    baseWeight = 20; // Manageable boot weight
                     break;
                 case 'ring':
-                    baseWeight = 3;
+                    baseWeight = 1; // Rings are very light
                     break;
                 case 'amulet':
-                    baseWeight = 20;
+                    baseWeight = 5; // Light amulets
                     break;
                 case 'potion':
-                    baseWeight = 20;
+                    baseWeight = 8; // Reasonable potion weight
                     break;
                 case 'food':
-                    baseWeight = 20; // Default food weight
+                    baseWeight = 10; // Lighter food weight
                     break;
                 default:
-                    baseWeight = 10; // Default item weight
+                    baseWeight = 5; // Lighter default weight
                     break;
             }
         }
@@ -1753,39 +1753,39 @@ class Player {
     }
     
     /**
-     * Get weapon weight based on damage (heavier = more damage)
+     * Get weapon weight based on damage (reasonable classic roguelike weights)
      */
     getWeaponWeight(weapon) {
         const baseDamage = weapon.damage || weapon.weaponDamage || 1;
-        return Math.max(10, baseDamage * 20); // 10-200 lbs range
+        return Math.max(3, baseDamage * 8); // 3-80 lbs range (dagger to greatsword)
     }
     
     /**
-     * Get armor weight based on AC bonus
+     * Get armor weight based on AC bonus (manageable armor weights)
      */
     getArmorWeight(armor) {
-        const acBonus = armor.armorClassBonus || 1;
-        return Math.max(50, acBonus * 100); // 50-500+ lbs range
+        const acBonus = Math.abs(armor.armorClassBonus) || 1; // Use absolute value since AC is negative
+        return Math.max(20, acBonus * 30); // 20-240 lbs range (leather to plate)
     }
     
     /**
-     * Get encumbrance level and speed modifier
+     * Get encumbrance level and speed modifier (more forgiving thresholds)
      */
     getEncumbranceLevel() {
         const ratio = this.currentWeight / this.maxWeight;
         
-        if (ratio <= 0.25) {
+        if (ratio <= 0.40) {
             return { level: 'UNENCUMBERED', name: 'Unencumbered', speedPenalty: 1.0, color: '#00ff00' };
-        } else if (ratio <= 0.50) {
-            return { level: 'BURDENED', name: 'Burdened', speedPenalty: 0.9, color: '#ffff00' };
-        } else if (ratio <= 0.75) {
-            return { level: 'STRESSED', name: 'Stressed', speedPenalty: 0.75, color: '#ff8800' };
+        } else if (ratio <= 0.65) {
+            return { level: 'BURDENED', name: 'Burdened', speedPenalty: 0.95, color: '#ffff00' };
+        } else if (ratio <= 0.85) {
+            return { level: 'STRESSED', name: 'Stressed', speedPenalty: 0.85, color: '#ff8800' };
         } else if (ratio <= 1.0) {
-            return { level: 'STRAINED', name: 'Strained', speedPenalty: 0.6, color: '#ff4400' };
+            return { level: 'STRAINED', name: 'Strained', speedPenalty: 0.7, color: '#ff4400' };
         } else if (ratio <= 1.25) {
-            return { level: 'OVERTAXED', name: 'Overtaxed', speedPenalty: 0.4, color: '#ff0000' };
+            return { level: 'OVERTAXED', name: 'Overtaxed', speedPenalty: 0.5, color: '#ff0000' };
         } else {
-            return { level: 'OVERLOADED', name: 'Overloaded', speedPenalty: 0.2, color: '#800000' };
+            return { level: 'OVERLOADED', name: 'Overloaded', speedPenalty: 0.3, color: '#800000' };
         }
     }
     

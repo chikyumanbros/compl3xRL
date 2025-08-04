@@ -591,20 +591,23 @@ class Dungeon {
     }
     
     /**
-     * Check if this forms a proper door connection (exactly 1 room, 1 corridor)
+     * Check if this forms a proper door connection considering 8-directional adjacency
+     * Must connect exactly 1 room and 1 corridor in cardinal directions
+     * Diagonal connections are considered for validation but not counted as primary connections
      */
     isProperDoorConnection(x, y, room) {
         let roomConnections = 0;
         let corridorConnections = 0;
         
-        const directions = [
+        // Primary check: 4 cardinal directions for main connections
+        const cardinalDirections = [
             { dx: 0, dy: -1 }, // North
             { dx: 1, dy: 0 },  // East  
             { dx: 0, dy: 1 },  // South
             { dx: -1, dy: 0 }  // West
         ];
         
-        for (const dir of directions) {
+        for (const dir of cardinalDirections) {
             const checkX = x + dir.dx;
             const checkY = y + dir.dy;
             
@@ -626,12 +629,53 @@ class Dungeon {
             }
         }
         
-        // Must connect exactly 1 room floor and exactly 1 corridor floor
-        return roomConnections === 1 && corridorConnections === 1;
+        // Must connect exactly 1 room floor and exactly 1 corridor floor in cardinal directions
+        if (roomConnections !== 1 || corridorConnections !== 1) {
+            return false;
+        }
+        
+        // Additional validation: Check diagonal connections don't create inappropriate openings
+        const diagonalDirections = [
+            { dx: -1, dy: -1 }, // NW
+            { dx: 1, dy: -1 },  // NE
+            { dx: -1, dy: 1 },  // SW
+            { dx: 1, dy: 1 }    // SE
+        ];
+        
+        let diagonalRoomFloors = 0;
+        let diagonalCorridorFloors = 0;
+        
+        for (const dir of diagonalDirections) {
+            const checkX = x + dir.dx;
+            const checkY = y + dir.dy;
+            
+            if (!this.isInBounds(checkX, checkY)) {
+                continue;
+            }
+            
+            const tile = this.getTile(checkX, checkY);
+            
+            if (tile.type === 'floor') {
+                if (checkX >= room.x && checkX < room.x + room.width &&
+                    checkY >= room.y && checkY < room.y + room.height) {
+                    diagonalRoomFloors++;
+                } else {
+                    diagonalCorridorFloors++;
+                }
+            }
+        }
+        
+        // Reject if too many diagonal connections (suggests complex junction)
+        if (diagonalRoomFloors > 1 || diagonalCorridorFloors > 1) {
+            return false;
+        }
+        
+        return true;
     }
     
     /**
-     * Check if door has proper wall enclosure (left-right OR up-down must be walls)
+     * Check if door has proper wall enclosure considering 8-directional adjacency
+     * Proper doors should not allow diagonal passage bypassing
      */
     hasProperWallEnclosure(x, y) {
         // Check horizontal enclosure (left AND right must be walls)
@@ -644,8 +688,53 @@ class Dungeon {
         const downTile = this.isInBounds(x, y + 1) ? this.getTile(x, y + 1) : { type: 'wall' };
         const verticalWalls = (upTile.type === 'wall') && (downTile.type === 'wall');
         
-        // Door is valid if EITHER horizontal OR vertical sides are both walls
-        return horizontalWalls || verticalWalls;
+        // If basic enclosure is met, check for diagonal bypasses
+        if (horizontalWalls || verticalWalls) {
+            // For horizontal corridors, check diagonal corners don't create bypasses
+            if (horizontalWalls) {
+                // Check diagonal corners: NW, NE, SW, SE
+                const corners = [
+                    this.isInBounds(x - 1, y - 1) ? this.getTile(x - 1, y - 1) : { type: 'wall' },
+                    this.isInBounds(x + 1, y - 1) ? this.getTile(x + 1, y - 1) : { type: 'wall' },
+                    this.isInBounds(x - 1, y + 1) ? this.getTile(x - 1, y + 1) : { type: 'wall' },
+                    this.isInBounds(x + 1, y + 1) ? this.getTile(x + 1, y + 1) : { type: 'wall' }
+                ];
+                
+                // If both up and down have floor diagonally adjacent, it's not a proper door
+                const upFloors = (upTile.type === 'floor' && 
+                                 (corners[0].type === 'floor' || corners[1].type === 'floor'));
+                const downFloors = (downTile.type === 'floor' && 
+                                   (corners[2].type === 'floor' || corners[3].type === 'floor'));
+                
+                if (upFloors && downFloors) {
+                    return false; // Diagonal bypass possible
+                }
+            }
+            
+            // For vertical corridors, check diagonal corners don't create bypasses
+            if (verticalWalls) {
+                const corners = [
+                    this.isInBounds(x - 1, y - 1) ? this.getTile(x - 1, y - 1) : { type: 'wall' },
+                    this.isInBounds(x + 1, y - 1) ? this.getTile(x + 1, y - 1) : { type: 'wall' },
+                    this.isInBounds(x - 1, y + 1) ? this.getTile(x - 1, y + 1) : { type: 'wall' },
+                    this.isInBounds(x + 1, y + 1) ? this.getTile(x + 1, y + 1) : { type: 'wall' }
+                ];
+                
+                // If both left and right have floor diagonally adjacent, it's not a proper door
+                const leftFloors = (leftTile.type === 'floor' && 
+                                   (corners[0].type === 'floor' || corners[2].type === 'floor'));
+                const rightFloors = (rightTile.type === 'floor' && 
+                                    (corners[1].type === 'floor' || corners[3].type === 'floor'));
+                
+                if (leftFloors && rightFloors) {
+                    return false; // Diagonal bypass possible
+                }
+            }
+            
+            return true;
+        }
+        
+        return false;
     }
     
 
