@@ -97,7 +97,8 @@ class Player {
             helmet: null,
             gloves: null,
             boots: null,
-            ring: null,
+            ring1: null,  // Left hand ring
+            ring2: null,  // Right hand ring
             amulet: null
         };
         
@@ -1092,6 +1093,13 @@ class Player {
                 }
             }
         }
+        
+        // Handle ring slot conversion from old single slot to new dual slots
+        if (this.equipment.ring && !this.equipment.ring1) {
+            console.log('Converting old single ring slot to dual ring slots');
+            this.equipment.ring1 = this.equipment.ring;
+            delete this.equipment.ring;
+        }
     }
     
     /**
@@ -1129,8 +1137,11 @@ class Player {
             this.penetration = weaponStats.penetration || 0;
         }
         // Add penetration from accessories
-        if (this.equipment.ring && this.equipment.ring.penetration) {
-            this.penetration += this.equipment.ring.penetration;
+        if (this.equipment.ring1 && this.equipment.ring1.penetration) {
+            this.penetration += this.equipment.ring1.penetration;
+        }
+        if (this.equipment.ring2 && this.equipment.ring2.penetration) {
+            this.penetration += this.equipment.ring2.penetration;
         }
         if (this.equipment.amulet && this.equipment.amulet.penetration) {
             this.penetration += this.equipment.amulet.penetration;
@@ -1163,9 +1174,14 @@ class Player {
             this.armorClass -= bootStats.armorClassBonus || 0;
         }
         
-        if (this.equipment.ring) {
-            this.baseToHit += this.equipment.ring.toHitBonus || 0;
-            this.armorClass -= this.equipment.ring.armorClassBonus || 0;
+        if (this.equipment.ring1) {
+            this.baseToHit += this.equipment.ring1.toHitBonus || 0;
+            this.armorClass -= this.equipment.ring1.armorClassBonus || 0;
+        }
+        
+        if (this.equipment.ring2) {
+            this.baseToHit += this.equipment.ring2.toHitBonus || 0;
+            this.armorClass -= this.equipment.ring2.armorClassBonus || 0;
         }
         
         if (this.equipment.amulet) {
@@ -1195,8 +1211,11 @@ class Player {
             const bootStats = this.equipment.boots.getEffectiveStats();
             this.totalProtection += bootStats.protection || 0;
         }
-        if (this.equipment.ring && this.equipment.ring.protection) {
-            this.totalProtection += this.equipment.ring.protection;
+        if (this.equipment.ring1 && this.equipment.ring1.protection) {
+            this.totalProtection += this.equipment.ring1.protection;
+        }
+        if (this.equipment.ring2 && this.equipment.ring2.protection) {
+            this.totalProtection += this.equipment.ring2.protection;
         }
         if (this.equipment.amulet && this.equipment.amulet.protection) {
             this.totalProtection += this.equipment.amulet.protection;
@@ -1483,7 +1502,15 @@ class Player {
                 slot = 'boots';
                 break;
             case 'ring':
-                slot = 'ring';
+                // Choose the first available ring slot
+                if (!this.equipment.ring1) {
+                    slot = 'ring1';
+                } else if (!this.equipment.ring2) {
+                    slot = 'ring2';
+                } else {
+                    // Both slots occupied, replace ring1 by default
+                    slot = 'ring1';
+                }
                 break;
             case 'amulet':
                 slot = 'amulet';

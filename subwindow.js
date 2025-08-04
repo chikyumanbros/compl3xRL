@@ -297,7 +297,8 @@ class SubWindow {
             { key: 'helmet', name: 'Helmet', keyHint: '(h)', letter: 'h' },
             { key: 'gloves', name: 'Gloves', keyHint: '(g)', letter: 'g' },
             { key: 'boots', name: 'Boots', keyHint: '(b)', letter: 'b' },
-            { key: 'ring', name: 'Ring', keyHint: '(r)', letter: 'r' },
+            { key: 'ring1', name: 'Ring (L)', keyHint: '(r)', letter: 'r' },
+            { key: 'ring2', name: 'Ring (R)', keyHint: '(1)', letter: '1' },
             { key: 'amulet', name: 'Amulet', keyHint: '(m)', letter: 'm' }
         ];
         
@@ -365,7 +366,7 @@ class SubWindow {
                 
                 // Invalid input, keep window open
                 if (window.game && window.game.renderer) {
-                    window.game.renderer.addLogMessage('Invalid slot key. Use w,a,s,h,g,b,r,m for details.');
+                    window.game.renderer.addLogMessage('Invalid slot key. Use w,a,s,h,g,b,r,1,m for details.');
                 }
                 return false;
             }
@@ -405,7 +406,8 @@ class SubWindow {
             'helmet': 'Helmet',
             'gloves': 'Gloves',
             'boots': 'Boots',
-            'ring': 'Ring',
+            'ring1': 'Ring (Left)',
+            'ring2': 'Ring (Right)',
             'amulet': 'Amulet'
         };
         slotDiv.textContent = `Equipped: ${slotNames[slotKey] || slotKey}`;

@@ -784,18 +784,33 @@ class Renderer {
             }
         }
         
-        // Update ring slot with stats
-        const ringSlot = document.getElementById('ring-slot');
-        if (ringSlot) {
-            if (equipment.ring) {
-                const ring = equipment.ring;
+        // Update ring1 slot with stats
+        const ring1Slot = document.getElementById('ring1-slot');
+        if (ring1Slot) {
+            if (equipment.ring1) {
+                const ring = equipment.ring1;
                 const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(ring);
                 const enchantDisplay = ring.enchantment > 0 ? `+${ring.enchantment} ` : 
                                       ring.enchantment < 0 ? `${ring.enchantment} ` : '';
                 
-                ringSlot.textContent = `Ring: ${enchantDisplay}${ring.name}${qualityText}${conditionText}${statsText}`;
+                ring1Slot.textContent = `Ring (L): ${enchantDisplay}${ring.name}${qualityText}${conditionText}${statsText}`;
             } else {
-                ringSlot.textContent = `Ring: None`;
+                ring1Slot.textContent = `Ring (L): None`;
+            }
+        }
+        
+        // Update ring2 slot with stats
+        const ring2Slot = document.getElementById('ring2-slot');
+        if (ring2Slot) {
+            if (equipment.ring2) {
+                const ring = equipment.ring2;
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(ring);
+                const enchantDisplay = ring.enchantment > 0 ? `+${ring.enchantment} ` : 
+                                      ring.enchantment < 0 ? `${ring.enchantment} ` : '';
+                
+                ring2Slot.textContent = `Ring (R): ${enchantDisplay}${ring.name}${qualityText}${conditionText}${statsText}`;
+            } else {
+                ring2Slot.textContent = `Ring (R): None`;
             }
         }
         
