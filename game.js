@@ -38,6 +38,9 @@ class Game {
         // Initialize input handling
         this.setupEventListeners();
         
+        // Setup debug commands for terrain bias testing
+        this.setupTerrainDebugCommands();
+        
         // Wait for DOM to be fully ready before checking autosave
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
@@ -2339,6 +2342,118 @@ class Game {
      */
     stop() {
         this.isRunning = false;
+    }
+    
+    /**
+     * Setup debug commands for terrain bias testing
+     */
+    setupTerrainDebugCommands() {
+        // Make debug functions available in console
+        window.debugTerrain = {
+            // Show terrain analysis for current level
+            analyze: () => {
+                if (!this.itemManager) {
+                    console.log('No ItemManager available');
+                    return;
+                }
+                
+                console.log('=== Terrain Analysis ===');
+                
+                let deadEnds = 0, corners = 0, alcoves = 0, centers = 0, junctions = 0, nearWalls = 0;
+                let totalFloors = 0;
+                let totalWeight = 0;
+                
+                for (let y = 0; y < this.dungeon.height; y++) {
+                    for (let x = 0; x < this.dungeon.width; x++) {
+                        const tile = this.dungeon.getTile(x, y);
+                        if (tile.type === 'floor') {
+                            totalFloors++;
+                            const weight = this.itemManager.calculateLocationSpecialness(x, y);
+                            totalWeight += weight;
+                            
+                            if (this.itemManager.isDeadEnd(x, y)) deadEnds++;
+                            if (this.itemManager.isCornerPosition(x, y)) corners++;
+                            if (this.itemManager.isHiddenAlcove(x, y)) alcoves++;
+                            if (this.itemManager.isRoomCenter(x, y)) centers++;
+                            if (this.itemManager.isCorridorJunction(x, y)) junctions++;
+                            if (this.itemManager.countNearbyWalls(x, y) >= 3) nearWalls++;
+                        }
+                    }
+                }
+                
+                console.log(`Total floor tiles: ${totalFloors}`);
+                console.log(`Dead-ends: ${deadEnds} (${(deadEnds/totalFloors*100).toFixed(1)}%)`);
+                console.log(`Corners: ${corners} (${(corners/totalFloors*100).toFixed(1)}%)`);
+                console.log(`Alcoves: ${alcoves} (${(alcoves/totalFloors*100).toFixed(1)}%)`);
+                console.log(`Room centers: ${centers} (${(centers/totalFloors*100).toFixed(1)}%)`);
+                console.log(`Junctions: ${junctions} (${(junctions/totalFloors*100).toFixed(1)}%)`);
+                console.log(`Near walls: ${nearWalls} (${(nearWalls/totalFloors*100).toFixed(1)}%)`);
+                console.log(`Average weight: ${(totalWeight/totalFloors).toFixed(2)}`);
+            },
+            
+            // Force spawn items with terrain bias
+            testSpawn: (count = 10) => {
+                if (!this.itemManager) {
+                    console.log('No ItemManager available');
+                    return;
+                }
+                
+                console.log(`=== Testing ${count} item spawns ===`);
+                const results = [];
+                
+                for (let i = 0; i < count; i++) {
+                    const pos = this.itemManager.getRandomFloorPosition();
+                    if (pos) {
+                        const weight = this.itemManager.calculateLocationSpecialness(pos.x, pos.y);
+                        const types = [];
+                        
+                        if (this.itemManager.isDeadEnd(pos.x, pos.y)) types.push('dead-end');
+                        if (this.itemManager.isCornerPosition(pos.x, pos.y)) types.push('corner');
+                        if (this.itemManager.isHiddenAlcove(pos.x, pos.y)) types.push('alcove');
+                        if (this.itemManager.isRoomCenter(pos.x, pos.y)) types.push('room-center');
+                        if (this.itemManager.isCorridorJunction(pos.x, pos.y)) types.push('junction');
+                        
+                        results.push({ pos, weight, types: types.length > 0 ? types.join(', ') : 'normal' });
+                    }
+                }
+                
+                results.sort((a, b) => b.weight - a.weight);
+                results.forEach((r, i) => {
+                    console.log(`${i+1}. (${r.pos.x}, ${r.pos.y}) weight: ${r.weight.toFixed(1)} [${r.types}]`);
+                });
+                
+                const avgWeight = results.reduce((sum, r) => sum + r.weight, 0) / results.length;
+                const specialCount = results.filter(r => r.weight > 1.0).length;
+                console.log(`Average weight: ${avgWeight.toFixed(2)}, Special locations: ${specialCount}/${results.length}`);
+            },
+            
+            // Show current items and their spawn locations
+            showItems: () => {
+                if (!this.itemManager || !this.itemManager.items) {
+                    console.log('No items available');
+                    return;
+                }
+                
+                console.log('=== Current Items ===');
+                this.itemManager.items.forEach((item, i) => {
+                    const weight = this.itemManager.calculateLocationSpecialness(item.x, item.y);
+                    const types = [];
+                    
+                    if (this.itemManager.isDeadEnd(item.x, item.y)) types.push('dead-end');
+                    if (this.itemManager.isCornerPosition(item.x, item.y)) types.push('corner');
+                    if (this.itemManager.isHiddenAlcove(item.x, item.y)) types.push('alcove');
+                    if (this.itemManager.isRoomCenter(item.x, item.y)) types.push('room-center');
+                    if (this.itemManager.isCorridorJunction(item.x, item.y)) types.push('junction');
+                    
+                    console.log(`${i+1}. ${item.name} at (${item.x}, ${item.y}) weight: ${weight.toFixed(1)} [${types.length > 0 ? types.join(', ') : 'normal'}]`);
+                });
+            }
+        };
+        
+        console.log('Terrain debug commands available:');
+        console.log('- debugTerrain.analyze() - Analyze current level terrain');
+        console.log('- debugTerrain.testSpawn(count) - Test item spawning with bias');
+        console.log('- debugTerrain.showItems() - Show current items and their locations');
     }
     
     /**

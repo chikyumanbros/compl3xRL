@@ -547,11 +547,8 @@ class EquipmentItem extends Item {
             displayName = `${this.enchantment} ${displayName}`;
         }
         
-        // Add durability suffix
-        const durabilityText = this.getDurabilityDisplay();
-        if (durabilityText) {
-            displayName += durabilityText;
-        }
+        // Note: Durability display is now handled by Player.getEquipmentDisplayInfo()
+        // to ensure consistency across all UI elements
         
         // Add cursed indicator
         if (this.cursed && this.identified) {
@@ -1856,6 +1853,8 @@ class ItemManager {
     getRandomFloorPosition() {
         // Get all valid floor positions
         const validPositions = [];
+        let totalWeight = 0;
+        let specialPositions = 0;
         
         for (let y = 0; y < this.dungeon.height; y++) {
             for (let x = 0; x < this.dungeon.width; x++) {
@@ -1863,6 +1862,8 @@ class ItemManager {
                 if (tile.type === 'floor' && !this.hasItemAt(x, y)) {
                     const specialness = this.calculateLocationSpecialness(x, y);
                     validPositions.push({ x, y, weight: specialness });
+                    totalWeight += specialness;
+                    if (specialness > 1.0) specialPositions++;
                 }
             }
         }
@@ -1871,8 +1872,22 @@ class ItemManager {
             return null;
         }
         
+        // Debug info about terrain bias (only log occasionally)
+        if (Math.random() < 0.1) { // 10% chance to log
+            const avgWeight = totalWeight / validPositions.length;
+            console.log(`Terrain bias: ${specialPositions}/${validPositions.length} special positions, avg weight: ${avgWeight.toFixed(2)}`);
+        }
+        
         // Weighted random selection
-        return this.weightedRandomSelect(validPositions);
+        const selectedPosition = this.weightedRandomSelect(validPositions);
+        
+        // Log special spawns
+        const selectedWeight = validPositions.find(p => p.x === selectedPosition.x && p.y === selectedPosition.y)?.weight || 1;
+        if (selectedWeight > 2.0) {
+            console.log(`Special spawn at (${selectedPosition.x}, ${selectedPosition.y}) with weight ${selectedWeight.toFixed(1)}`);
+        }
+        
+        return selectedPosition;
     }
     
     /**
@@ -1881,36 +1896,48 @@ class ItemManager {
      */
     calculateLocationSpecialness(x, y) {
         let specialness = 1.0; // Base weight
+        let locationTypes = [];
         
-        // Check for dead-end (袋小路)
+        // Check for dead-end (袋小路) - highest priority
         if (this.isDeadEnd(x, y)) {
-            specialness *= 3.0; // 3x more likely in dead-ends
+            specialness *= 5.0; // 5x more likely in dead-ends
+            locationTypes.push('dead-end');
         }
         
         // Check for corner position (部屋の角)
         if (this.isCornerPosition(x, y)) {
-            specialness *= 2.5; // 2.5x more likely in corners
+            specialness *= 4.0; // 4x more likely in corners
+            locationTypes.push('corner');
         }
         
         // Check for hidden alcove (隠れた場所)
         if (this.isHiddenAlcove(x, y)) {
-            specialness *= 2.2; // 2.2x more likely in hidden spots
+            specialness *= 3.5; // 3.5x more likely in hidden spots
+            locationTypes.push('alcove');
         }
         
         // Check for room center (部屋の中央)
         if (this.isRoomCenter(x, y)) {
-            specialness *= 1.8; // 1.8x more likely in room centers
+            specialness *= 2.5; // 2.5x more likely in room centers
+            locationTypes.push('room-center');
         }
         
         // Check for corridor junction (通路の分岐点)
         if (this.isCorridorJunction(x, y)) {
-            specialness *= 1.5; // 1.5x more likely at junctions
+            specialness *= 2.0; // 2x more likely at junctions
+            locationTypes.push('junction');
         }
         
         // Slightly favor positions near walls (壁の近く)
         const nearWallCount = this.countNearbyWalls(x, y);
         if (nearWallCount >= 3) {
-            specialness *= 1.3; // 1.3x more likely near walls
+            specialness *= 1.5; // 1.5x more likely near walls
+            locationTypes.push('near-walls');
+        }
+        
+        // Debug: Log high-value locations
+        if (specialness > 5.0 && Math.random() < 0.1) {
+            console.log(`High-value location (${x}, ${y}): weight ${specialness.toFixed(1)}, types: ${locationTypes.join(', ')}`);
         }
         
         return specialness;
