@@ -424,16 +424,35 @@ class EquipmentItem extends Item {
         const multiplier = multipliers[state] || 1.0;
         
         return {
-            damage: Math.floor(this.damage * multiplier),
-            weaponDamage: Math.floor(this.weaponDamage * multiplier),
-            toHitBonus: Math.floor(this.toHitBonus * multiplier),
-            armorClassBonus: Math.floor(this.armorClassBonus * multiplier),
-            penetration: Math.floor(this.penetration * multiplier),
-            protection: Math.floor(this.protection * multiplier),
-            blockChance: Math.floor(this.blockChance * multiplier),
+            damage: this.applyDurabilityReduction(this.damage, multiplier, state),
+            weaponDamage: this.applyDurabilityReduction(this.weaponDamage, multiplier, state),
+            toHitBonus: this.applyDurabilityReduction(this.toHitBonus, multiplier, state),
+            armorClassBonus: this.applyDurabilityReduction(this.armorClassBonus, multiplier, state),
+            penetration: this.applyDurabilityReduction(this.penetration, multiplier, state),
+            protection: this.applyDurabilityReduction(this.protection, multiplier, state),
+            blockChance: this.applyDurabilityReduction(this.blockChance, multiplier, state),
             durabilityState: state,
             durabilityRatio: this.currentDurability / this.maxDurability
         };
+    }
+    
+    /**
+     * Apply durability reduction with minimum value guarantee
+     * Prevents low-stat equipment from becoming completely useless when damaged
+     */
+    applyDurabilityReduction(originalValue, multiplier, state) {
+        // If original value is 0, keep it 0
+        if (originalValue === 0) return 0;
+        
+        // If item is broken, no function remains
+        if (state === 'broken') return 0;
+        
+        // Apply reduction
+        const reducedValue = Math.floor(originalValue * multiplier);
+        
+        // Guarantee minimum value of 1 for non-zero original values
+        // This prevents low-stat equipment from becoming completely useless
+        return Math.max(1, reducedValue);
     }
     
     /**
