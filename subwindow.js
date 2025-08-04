@@ -15,6 +15,12 @@ class SubWindow {
         this.cancelBtn = document.getElementById('sub-window-cancel');
         this.closeBtn = document.getElementById('sub-window-close');
         
+        // === CLASSICAL ROGUELIKE: HIDE MOUSE-CLICKABLE BUTTONS ===
+        // Pure keyboard interface - no mouse interaction allowed
+        this.confirmBtn.style.display = 'none';  // Use Enter key instead
+        this.cancelBtn.style.display = 'none';   // Use Escape key instead  
+        this.closeBtn.style.display = 'none';    // Use Escape key instead
+        
         this.isOpen = false;
         this.callback = null;
         this.selectedIndex = -1;
@@ -23,20 +29,8 @@ class SubWindow {
     }
     
     setupEventListeners() {
-        // Close button
-        this.closeBtn.addEventListener('click', () => {
-            this.close();
-        });
-        
-        // Confirm button
-        this.confirmBtn.addEventListener('click', () => {
-            this.handleConfirm();
-        });
-        
-        // Cancel button
-        this.cancelBtn.addEventListener('click', () => {
-            this.close();
-        });
+        // === PURE KEYBOARD-ONLY INTERFACE ===
+        // No mouse clicks allowed - classical roguelike principle
         
         // Enter key in text input
         this.textInput.addEventListener('keypress', (e) => {
@@ -53,7 +47,7 @@ class SubWindow {
             }
         });
         
-        // Escape key to close
+        // Escape key to close (classical roguelike standard)
         document.addEventListener('keydown', (e) => {
             if (this.isOpen && e.key === 'Escape') {
                 e.preventDefault();
@@ -71,12 +65,8 @@ class SubWindow {
             }
         });
         
-        // Click outside to close
-        this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay) {
-                this.close();
-            }
-        });
+        // Note: Mouse interactions removed to maintain classical roguelike purity
+        // All interactions must be keyboard-only (ESC to close, Enter to confirm)
     }
     
     showInventory(player) {
