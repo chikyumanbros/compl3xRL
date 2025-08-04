@@ -2363,6 +2363,9 @@ class Game {
                 let totalFloors = 0;
                 let totalWeight = 0;
                 
+                // Count detailed information about dead-ends
+                let oneAdjacentCount = 0, twoAdjacentCount = 0;
+                
                 for (let y = 0; y < this.dungeon.height; y++) {
                     for (let x = 0; x < this.dungeon.width; x++) {
                         const tile = this.dungeon.getTile(x, y);
@@ -2370,6 +2373,10 @@ class Game {
                             totalFloors++;
                             const weight = this.itemManager.calculateLocationSpecialness(x, y);
                             totalWeight += weight;
+                            
+                            const adjacentFloors = this.itemManager.countAdjacentFloors(x, y);
+                            if (adjacentFloors === 1) oneAdjacentCount++;
+                            if (adjacentFloors === 2) twoAdjacentCount++;
                             
                             if (this.itemManager.isDeadEnd(x, y)) deadEnds++;
                             if (this.itemManager.isCornerPosition(x, y)) corners++;
@@ -2382,7 +2389,9 @@ class Game {
                 }
                 
                 console.log(`Total floor tiles: ${totalFloors}`);
-                console.log(`Dead-ends: ${deadEnds} (${(deadEnds/totalFloors*100).toFixed(1)}%)`);
+                console.log(`Tiles with 1 adjacent floor: ${oneAdjacentCount} (${(oneAdjacentCount/totalFloors*100).toFixed(1)}%)`);
+                console.log(`Tiles with 2 adjacent floors: ${twoAdjacentCount} (${(twoAdjacentCount/totalFloors*100).toFixed(1)}%)`);
+                console.log(`Dead-ends (detected): ${deadEnds} (${(deadEnds/totalFloors*100).toFixed(1)}%)`);
                 console.log(`Corners: ${corners} (${(corners/totalFloors*100).toFixed(1)}%)`);
                 console.log(`Alcoves: ${alcoves} (${(alcoves/totalFloors*100).toFixed(1)}%)`);
                 console.log(`Room centers: ${centers} (${(centers/totalFloors*100).toFixed(1)}%)`);
@@ -2405,6 +2414,7 @@ class Game {
                     const pos = this.itemManager.getRandomFloorPosition();
                     if (pos) {
                         const weight = this.itemManager.calculateLocationSpecialness(pos.x, pos.y);
+                        const adjacentFloors = this.itemManager.countAdjacentFloors(pos.x, pos.y);
                         const types = [];
                         
                         if (this.itemManager.isDeadEnd(pos.x, pos.y)) types.push('dead-end');
@@ -2413,18 +2423,24 @@ class Game {
                         if (this.itemManager.isRoomCenter(pos.x, pos.y)) types.push('room-center');
                         if (this.itemManager.isCorridorJunction(pos.x, pos.y)) types.push('junction');
                         
-                        results.push({ pos, weight, types: types.length > 0 ? types.join(', ') : 'normal' });
+                        results.push({ 
+                            pos, 
+                            weight, 
+                            adjacentFloors,
+                            types: types.length > 0 ? types.join(', ') : 'normal' 
+                        });
                     }
                 }
                 
                 results.sort((a, b) => b.weight - a.weight);
                 results.forEach((r, i) => {
-                    console.log(`${i+1}. (${r.pos.x}, ${r.pos.y}) weight: ${r.weight.toFixed(1)} [${r.types}]`);
+                    console.log(`${i+1}. (${r.pos.x}, ${r.pos.y}) weight: ${r.weight.toFixed(1)}, adj: ${r.adjacentFloors} [${r.types}]`);
                 });
                 
                 const avgWeight = results.reduce((sum, r) => sum + r.weight, 0) / results.length;
                 const specialCount = results.filter(r => r.weight > 1.0).length;
-                console.log(`Average weight: ${avgWeight.toFixed(2)}, Special locations: ${specialCount}/${results.length}`);
+                const deadEndCount = results.filter(r => r.types.includes('dead-end')).length;
+                console.log(`Average weight: ${avgWeight.toFixed(2)}, Special locations: ${specialCount}/${results.length}, Dead-ends: ${deadEndCount}/${results.length}`);
             },
             
             // Show current items and their spawn locations
@@ -2437,6 +2453,7 @@ class Game {
                 console.log('=== Current Items ===');
                 this.itemManager.items.forEach((item, i) => {
                     const weight = this.itemManager.calculateLocationSpecialness(item.x, item.y);
+                    const adjacentFloors = this.itemManager.countAdjacentFloors(item.x, item.y);
                     const types = [];
                     
                     if (this.itemManager.isDeadEnd(item.x, item.y)) types.push('dead-end');
@@ -2445,7 +2462,7 @@ class Game {
                     if (this.itemManager.isRoomCenter(item.x, item.y)) types.push('room-center');
                     if (this.itemManager.isCorridorJunction(item.x, item.y)) types.push('junction');
                     
-                    console.log(`${i+1}. ${item.name} at (${item.x}, ${item.y}) weight: ${weight.toFixed(1)} [${types.length > 0 ? types.join(', ') : 'normal'}]`);
+                    console.log(`${i+1}. ${item.name} at (${item.x}, ${item.y}) weight: ${weight.toFixed(1)}, adj: ${adjacentFloors} [${types.length > 0 ? types.join(', ') : 'normal'}]`);
                 });
             }
         };

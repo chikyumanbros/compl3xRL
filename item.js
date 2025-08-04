@@ -1954,10 +1954,18 @@ class ItemManager {
         let specialness = 1.0; // Base weight
         let locationTypes = [];
         
+        // Debug: Count adjacent floors for dead-end detection
+        const adjacentFloors = this.countAdjacentFloors(x, y);
+        
         // Check for dead-end (袋小路) - highest priority
         if (this.isDeadEnd(x, y)) {
             specialness *= 5.0; // 5x more likely in dead-ends
             locationTypes.push('dead-end');
+            
+            // Debug: Always log dead-end detection
+            if (Math.random() < 0.3) { // 30% chance to log
+                console.log(`Dead-end detected at (${x}, ${y}): adjacent floors = ${adjacentFloors}`);
+            }
         }
         
         // Check for corner position (部屋の角)
@@ -1992,19 +2000,53 @@ class ItemManager {
         }
         
         // Debug: Log high-value locations
-        if (specialness > 5.0 && Math.random() < 0.1) {
-            console.log(`High-value location (${x}, ${y}): weight ${specialness.toFixed(1)}, types: ${locationTypes.join(', ')}`);
+        if (specialness > 3.0 && Math.random() < 0.2) { // Lowered threshold and increased chance
+            console.log(`Special location (${x}, ${y}): weight ${specialness.toFixed(1)}, adjacent floors: ${adjacentFloors}, types: ${locationTypes.join(', ')}`);
         }
         
         return specialness;
     }
     
     /**
-     * Check if position is a dead-end (only 1 adjacent floor)
+     * Check if position is a dead-end (only 1-2 adjacent floors in narrow passages)
      */
     isDeadEnd(x, y) {
         const adjacentFloors = this.countAdjacentFloors(x, y);
-        return adjacentFloors === 1;
+        
+        // True dead-end: only 1 adjacent floor
+        if (adjacentFloors === 1) {
+            return true;
+        }
+        
+        // Near dead-end: 2 adjacent floors but in a narrow passage
+        if (adjacentFloors === 2) {
+            // Check if this is at the end of a narrow corridor
+            // (not in the middle of a straight corridor)
+            const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N, E, S, W
+            let floorDirections = [];
+            
+            for (let i = 0; i < directions.length; i++) {
+                const [dx, dy] = directions[i];
+                const checkX = x + dx;
+                const checkY = y + dy;
+                
+                if (this.dungeon.isInBounds(checkX, checkY)) {
+                    const tile = this.dungeon.getTile(checkX, checkY);
+                    if (tile.type === 'floor') {
+                        floorDirections.push(i);
+                    }
+                }
+            }
+            
+            // If the two floors are opposite each other (straight corridor), not a dead-end
+            if (floorDirections.length === 2) {
+                const [dir1, dir2] = floorDirections;
+                const isOpposite = Math.abs(dir1 - dir2) === 2;
+                return !isOpposite; // Dead-end if NOT opposite (L-shaped corner)
+            }
+        }
+        
+        return false;
     }
     
     /**
