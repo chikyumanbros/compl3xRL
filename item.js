@@ -134,6 +134,11 @@ class EquipmentItem extends Item {
         this.category = data.category || 'common'; // weapon/armor category classification
         this.weaponType = data.weaponType || null; // weapon type for skill systems
         
+        // Durability system
+        this.durability = data.durability || 'normal'; // normal, cracked1, cracked2, cracked3, broken
+        this.maxDurability = data.maxDurability || this.calculateMaxDurability();
+        this.currentDurability = data.currentDurability || this.maxDurability;
+        
         // Special properties
         this.properties = data.properties || []; // magic properties, curses, etc.
         this.cursed = data.cursed || false;
@@ -328,9 +333,267 @@ class EquipmentItem extends Item {
             cursed: this.cursed,
             identified: this.identified,
             healDice: this.healDice,
-            healAmount: this.healAmount
+            healAmount: this.healAmount,
+            // Durability properties
+            durability: this.durability,
+            maxDurability: this.maxDurability,
+            currentDurability: this.currentDurability
         };
         return new EquipmentItem(this.name, data);
+    }
+    
+    /**
+     * Calculate maximum durability based on material and quality
+     */
+    calculateMaxDurability() {
+        let baseDurability = 100;
+        
+        // Material durability modifiers
+        const materialModifiers = {
+            'wood': 0.7,      // 70% durability
+            'leather': 0.8,   // 80% durability
+            'iron': 1.0,      // 100% durability (base)
+            'steel': 1.3,     // 130% durability
+            'silver': 1.1,    // 110% durability (soft but magical)
+            'gold': 1.2,      // 120% durability (magical enhancement)
+            'platinum': 1.5,  // 150% durability (rare and strong)
+            'mithril': 1.8,   // 180% durability
+            'adamantine': 2.5 // 250% durability
+        };
+        
+        // Quality durability modifiers
+        const qualityModifiers = {
+            'poor': 0.6,      // 60% durability
+            'normal': 1.0,    // 100% durability (base)
+            'fine': 1.4,      // 140% durability
+            'masterwork': 1.8, // 180% durability
+            'legendary': 2.5   // 250% durability
+        };
+        
+        // Equipment type base durability
+        const typeModifiers = {
+            'weapon': 1.0,    // Base durability
+            'armor': 1.2,     // 20% more durable
+            'shield': 0.9,    // 10% less durable (takes direct hits)
+            'helmet': 1.1,    // 10% more durable
+            'gloves': 0.8,    // 20% less durable
+            'boots': 0.9,     // 10% less durable
+            'ring': 0.0,      // Rings don't have durability (magical)
+            'amulet': 0.0,    // Amulets don't have durability (magical)
+            'light': 0.5      // Light sources have low durability
+        };
+        
+        const materialMod = materialModifiers[this.material] || 1.0;
+        const qualityMod = qualityModifiers[this.quality] || 1.0;
+        const typeMod = typeModifiers[this.type] || 1.0;
+        
+        return Math.floor(baseDurability * materialMod * qualityMod * typeMod);
+    }
+    
+    /**
+     * Get current durability state based on current/max ratio
+     */
+    getDurabilityState() {
+        if (this.currentDurability <= 0) {
+            return 'broken';
+        }
+        
+        const ratio = this.currentDurability / this.maxDurability;
+        if (ratio >= 0.9) return 'normal';
+        if (ratio >= 0.7) return 'cracked1';
+        if (ratio >= 0.4) return 'cracked2';
+        if (ratio > 0) return 'cracked3';
+        return 'broken';
+    }
+    
+    /**
+     * Get effective stats considering durability degradation
+     */
+    getEffectiveStats() {
+        const state = this.getDurabilityState();
+        
+        // Durability multipliers for different stats
+        const multipliers = {
+            'normal': 1.0,
+            'cracked1': 0.95,  // 5% reduction
+            'cracked2': 0.85,  // 15% reduction
+            'cracked3': 0.7,   // 30% reduction
+            'broken': 0.0      // Complete failure
+        };
+        
+        const multiplier = multipliers[state] || 1.0;
+        
+        return {
+            damage: Math.floor(this.damage * multiplier),
+            weaponDamage: Math.floor(this.weaponDamage * multiplier),
+            toHitBonus: Math.floor(this.toHitBonus * multiplier),
+            armorClassBonus: Math.floor(this.armorClassBonus * multiplier),
+            penetration: Math.floor(this.penetration * multiplier),
+            protection: Math.floor(this.protection * multiplier),
+            blockChance: Math.floor(this.blockChance * multiplier),
+            durabilityState: state,
+            durabilityRatio: this.currentDurability / this.maxDurability
+        };
+    }
+    
+    /**
+     * Calculate break chance based on material, type, and usage
+     */
+    getDurabilityBreakChance(usageType = 'normal') {
+        // Base break chance per use (very low)
+        let baseChance = 0.001; // 0.1% base chance
+        
+        // Material resistance (lower = more durable)
+        const materialResistance = {
+            'wood': 1.5,      // 50% more likely to break
+            'leather': 1.2,   // 20% more likely
+            'iron': 1.0,      // Base chance
+            'steel': 0.7,     // 30% less likely
+            'mithril': 0.4,   // 60% less likely
+            'adamantine': 0.2 // 80% less likely
+        };
+        
+        // Usage type modifiers
+        const usageModifiers = {
+            'normal': 1.0,     // Normal use
+            'critical': 2.0,   // Critical hits cause more wear
+            'block': 1.5,      // Blocking puts stress on equipment
+            'fumble': 3.0      // Fumbling damages equipment more
+        };
+        
+        // Quality modifiers
+        const qualityModifiers = {
+            'poor': 2.0,      // Poor quality breaks more easily
+            'normal': 1.0,    // Base chance
+            'fine': 0.7,      // Fine quality more durable
+            'masterwork': 0.4, // Masterwork very durable
+            'legendary': 0.1   // Legendary almost unbreakable
+        };
+        
+        // Current durability modifier (more likely to break when damaged)
+        const durabilityRatio = this.currentDurability / this.maxDurability;
+        const durabilityModifier = Math.max(0.5, 2.0 - durabilityRatio); // 0.5x to 2.0x
+        
+        const materialMod = materialResistance[this.material] || 1.0;
+        const usageMod = usageModifiers[usageType] || 1.0;
+        const qualityMod = qualityModifiers[this.quality] || 1.0;
+        
+        return baseChance * materialMod * usageMod * qualityMod * durabilityModifier;
+    }
+    
+    /**
+     * Apply durability damage to the equipment
+     */
+    takeDurabilityDamage(amount = 1, usageType = 'normal') {
+        if (this.currentDurability <= 0) {
+            return false; // Already broken
+        }
+        
+        // Check for immediate break
+        const breakChance = this.getDurabilityBreakChance(usageType);
+        if (Math.random() < breakChance) {
+            // Random break occurred
+            const damage = Math.floor(Math.random() * 10) + 5; // 5-14 damage
+            this.currentDurability = Math.max(0, this.currentDurability - damage);
+            return true; // Broke this turn
+        }
+        
+        // Normal wear and tear
+        this.currentDurability = Math.max(0, this.currentDurability - amount);
+        return this.currentDurability <= 0; // Return true if just broke
+    }
+    
+    /**
+     * Repair equipment (restore durability)
+     */
+    repair(amount) {
+        this.currentDurability = Math.min(this.maxDurability, this.currentDurability + amount);
+        return this.currentDurability >= this.maxDurability;
+    }
+    
+    /**
+     * Get durability display string
+     */
+    getDurabilityDisplay() {
+        const state = this.getDurabilityState();
+        const stateNames = {
+            'normal': '',
+            'cracked1': ' (lightly damaged)',
+            'cracked2': ' (damaged)', 
+            'cracked3': ' (heavily damaged)',
+            'broken': ' (BROKEN)'
+        };
+        
+        return stateNames[state] || '';
+    }
+    
+    /**
+     * Check if equipment is usable (not broken)
+     */
+    isUsable() {
+        return this.getDurabilityState() !== 'broken';
+    }
+    
+    /**
+     * Get display name including durability status
+     */
+    getDisplayName() {
+        let displayName = this.name;
+        
+        // Add enchantment prefix if any
+        if (this.enchantment > 0) {
+            displayName = `+${this.enchantment} ${displayName}`;
+        } else if (this.enchantment < 0) {
+            displayName = `${this.enchantment} ${displayName}`;
+        }
+        
+        // Add durability suffix
+        const durabilityText = this.getDurabilityDisplay();
+        if (durabilityText) {
+            displayName += durabilityText;
+        }
+        
+        // Add cursed indicator
+        if (this.cursed && this.identified) {
+            displayName += ' (cursed)';
+        }
+        
+        return displayName;
+    }
+    
+    /**
+     * Get detailed description including durability and stats
+     */
+    getDetailedDescription() {
+        let description = this.description || '';
+        
+        // Add durability information
+        const state = this.getDurabilityState();
+        const durabilityRatio = this.currentDurability / this.maxDurability;
+        const durabilityPercent = Math.floor(durabilityRatio * 100);
+        
+        description += `\n\nDurability: ${durabilityPercent}% (${this.currentDurability}/${this.maxDurability})`;
+        
+        // Add effective stats if damaged
+        if (state !== 'normal') {
+            const effectiveStats = this.getEffectiveStats();
+            description += `\nReduced effectiveness due to damage.`;
+            
+            if (this.damage > 0) {
+                description += `\nDamage: ${effectiveStats.damage} (base: ${this.damage})`;
+            }
+            if (this.armorClassBonus > 0) {
+                description += `\nAC Bonus: ${effectiveStats.armorClassBonus} (base: ${this.armorClassBonus})`;
+            }
+            if (this.protection > 0) {
+                description += `\nProtection: ${effectiveStats.protection} (base: ${this.protection})`;
+            }
+            if (this.blockChance > 0) {
+                description += `\nBlock Chance: ${effectiveStats.blockChance}% (base: ${this.blockChance}%)`;
+            }
+        }
+        
+        return description;
     }
 }
 
@@ -418,6 +681,29 @@ class EquipmentManager {
         const data = { ...template, ...modifications };
         data.enchantment = enchantment;
         
+        // Generate random quality if not specified
+        if (!data.quality && category !== 'potions' && category !== 'food') {
+            // Magic items (rings, amulets) have better quality distribution
+            if (category === 'rings' || category === 'amulets') {
+                data.quality = this.generateMagicalQuality();
+            } else {
+                data.quality = this.generateRandomQuality();
+            }
+        }
+        
+        // Generate random initial durability for equipment items
+        if (category !== 'potions' && category !== 'food' && !data.currentDurability) {
+            // Only equipment items that can have durability get random initial condition
+            const itemType = data.type || template.type;
+            if (itemType !== 'ring' && itemType !== 'amulet') {
+                const condition = this.generateRandomDurability();
+                const item = new EquipmentItem(template.name, data);
+                const maxDur = item.calculateMaxDurability();
+                const percentage = this.generateInitialDurabilityPercentage(condition);
+                data.currentDurability = Math.floor(maxDur * percentage);
+            }
+        }
+        
         // Apply enchantment bonuses
         if (enchantment !== 0) {
             if (data.damage !== undefined) {
@@ -432,6 +718,94 @@ class EquipmentManager {
         }
         
         return new EquipmentItem(template.name, data);
+    }
+    
+    /**
+     * Generate random quality with weighted distribution
+     */
+    static generateRandomQuality() {
+        const qualityTable = {
+            'poor': 15,      // 15%
+            'normal': 60,    // 60%
+            'fine': 18,      // 18%
+            'masterwork': 6, // 6%
+            'legendary': 1   // 1%
+        };
+        
+        const totalWeight = Object.values(qualityTable).reduce((sum, weight) => sum + weight, 0);
+        let random = Math.floor(Math.random() * totalWeight);
+        
+        for (const [quality, weight] of Object.entries(qualityTable)) {
+            random -= weight;
+            if (random < 0) {
+                return quality;
+            }
+        }
+        
+        return 'normal'; // Fallback
+    }
+    
+    /**
+     * Generate magical quality with higher chances for better qualities
+     */
+    static generateMagicalQuality() {
+        const magicalQualityTable = {
+            'poor': 5,       // 5% (rare for magical items)
+            'normal': 30,    // 30%
+            'fine': 35,      // 35%
+            'masterwork': 25, // 25%
+            'legendary': 5   // 5%
+        };
+        
+        const totalWeight = Object.values(magicalQualityTable).reduce((sum, weight) => sum + weight, 0);
+        let random = Math.floor(Math.random() * totalWeight);
+        
+        for (const [quality, weight] of Object.entries(magicalQualityTable)) {
+            random -= weight;
+            if (random < 0) {
+                return quality;
+            }
+        }
+        
+        return 'fine'; // Fallback to fine for magical items
+    }
+    
+    /**
+     * Generate random initial durability condition
+     */
+    static generateRandomDurability() {
+        const durabilityTable = {
+            'normal': 25,     // 25% - Excellent condition
+            'cracked1': 35,   // 35% - Good condition  
+            'cracked2': 25,   // 25% - Fair condition
+            'cracked3': 15    // 15% - Poor condition
+            // Note: 'broken' items are not generated naturally
+        };
+        
+        const totalWeight = Object.values(durabilityTable).reduce((sum, weight) => sum + weight, 0);
+        let random = Math.floor(Math.random() * totalWeight);
+        
+        for (const [condition, weight] of Object.entries(durabilityTable)) {
+            random -= weight;
+            if (random < 0) {
+                return condition;
+            }
+        }
+        
+        return 'normal'; // fallback
+    }
+    
+    /**
+     * Generate initial durability percentage based on condition
+     */
+    static generateInitialDurabilityPercentage(condition) {
+        switch (condition) {
+            case 'normal':   return 0.85 + Math.random() * 0.15;  // 85-100%
+            case 'cracked1': return 0.60 + Math.random() * 0.25;  // 60-85%
+            case 'cracked2': return 0.35 + Math.random() * 0.25;  // 35-60%
+            case 'cracked3': return 0.10 + Math.random() * 0.25;  // 10-35%
+            default:         return 1.0;  // 100% for unknown conditions
+        }
     }
     
     /**
@@ -500,6 +874,29 @@ class EquipmentManager {
         const data = { ...template, ...modifications };
         data.enchantment = enchantment;
         data.quantity = quantity;
+        
+        // Generate random quality if not specified (only for equipment, not consumables)
+        if (!data.quality && category !== 'potions' && category !== 'food') {
+            // Magic items (rings, amulets) have better quality distribution
+            if (category === 'rings' || category === 'amulets') {
+                data.quality = this.generateMagicalQuality();
+            } else {
+                data.quality = this.generateRandomQuality();
+            }
+        }
+        
+        // Generate random initial durability for equipment items
+        if (category !== 'potions' && category !== 'food' && !data.currentDurability) {
+            // Only equipment items that can have durability get random initial condition
+            const itemType = data.type || template.type;
+            if (itemType !== 'ring' && itemType !== 'amulet') {
+                const condition = this.generateRandomDurability();
+                const item = new EquipmentItem(template.name, data);
+                const maxDur = item.calculateMaxDurability();
+                const percentage = this.generateInitialDurabilityPercentage(condition);
+                data.currentDurability = Math.floor(maxDur * percentage);
+            }
+        }
         
         // Apply enchantment bonuses
         if (enchantment !== 0) {
@@ -641,7 +1038,12 @@ const EQUIPMENT_CATEGORIES = {
     
     // Tool Categories
     UTILITY_TOOL: 'utility_tool',        // General purpose tools
-    LIGHT_SOURCE: 'light_source'         // Illumination tools
+    LIGHT_SOURCE: 'light_source',        // Illumination tools
+    
+    // Magic Categories
+    PROTECTION: 'protection',            // Protective magical items
+    COMBAT: 'combat',                    // Combat enhancement items
+    ENHANCEMENT: 'enhancement'           // Multi-purpose enhancement items
 };
 
 /**
@@ -744,6 +1146,68 @@ const EQUIPMENT_TYPES = {
             symbol: '\\',
             color: '#E0E0E0',
             description: 'A massive two-handed sword. Devastating in skilled hands. (1d10+5 damage, AP 3)'
+        },
+        
+        // Blunt Weapons (鈍器系)
+        club: {
+            name: 'Club',
+            type: 'weapon',
+            category: EQUIPMENT_CATEGORIES.LIGHT_WEAPON,
+            weaponType: WEAPON_TYPES.MACE,
+            damage: 1,
+            weaponDamage: 4, // d4
+            penetration: 0, // No armor penetration
+            weight: 20,
+            value: 5,
+            material: 'wood',
+            symbol: ')',
+            color: '#8B4513',
+            description: 'A simple wooden club. Basic but effective. (1d4+1 damage)'
+        },
+        mace: {
+            name: 'Mace',
+            type: 'weapon',
+            category: EQUIPMENT_CATEGORIES.ONE_HANDED_WEAPON,
+            weaponType: WEAPON_TYPES.MACE,
+            damage: 3,
+            weaponDamage: 6, // d6
+            penetration: 2, // Effective against armor
+            weight: 40,
+            value: 120,
+            material: 'iron',
+            symbol: ')',
+            color: '#A0A0A0',
+            description: 'A heavy iron mace. Crushes armor and bone. (1d6+3 damage, AP 2)'
+        },
+        warhammer: {
+            name: 'War Hammer',
+            type: 'weapon',
+            category: EQUIPMENT_CATEGORIES.ONE_HANDED_WEAPON,
+            weaponType: WEAPON_TYPES.HAMMER,
+            damage: 4,
+            weaponDamage: 8, // d8
+            penetration: 3, // High armor penetration
+            weight: 50,
+            value: 180,
+            material: 'steel',
+            symbol: 'T',
+            color: '#E0E0E0',
+            description: 'A steel war hammer. Designed to crush heavy armor. (1d8+4 damage, AP 3)'
+        },
+        maul: {
+            name: 'Maul',
+            type: 'weapon',
+            category: EQUIPMENT_CATEGORIES.TWO_HANDED_WEAPON,
+            weaponType: WEAPON_TYPES.HAMMER,
+            damage: 6,
+            weaponDamage: 12, // d12
+            penetration: 4, // Maximum armor penetration
+            weight: 100,
+            value: 350,
+            material: 'steel',
+            symbol: 'T',
+            color: '#E0E0E0',
+            description: 'A massive two-handed maul. Devastating crushing power. (1d12+6 damage, AP 4)'
         }
     },
     
@@ -1387,22 +1851,247 @@ class ItemManager {
     }
     
     /**
-     * Find a random floor position in the dungeon
+     * Find a random floor position in the dungeon with location-based weighting
      */
     getRandomFloorPosition() {
-        const maxAttempts = 100;
+        // Get all valid floor positions
+        const validPositions = [];
         
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            const x = Math.floor(Math.random() * this.dungeon.width);
-            const y = Math.floor(Math.random() * this.dungeon.height);
-            
-            const tile = this.dungeon.getTile(x, y);
-            if (tile.type === 'floor' && !this.hasItemAt(x, y)) {
-                return { x, y };
+        for (let y = 0; y < this.dungeon.height; y++) {
+            for (let x = 0; x < this.dungeon.width; x++) {
+                const tile = this.dungeon.getTile(x, y);
+                if (tile.type === 'floor' && !this.hasItemAt(x, y)) {
+                    const specialness = this.calculateLocationSpecialness(x, y);
+                    validPositions.push({ x, y, weight: specialness });
+                }
             }
         }
         
-        return null;
+        if (validPositions.length === 0) {
+            return null;
+        }
+        
+        // Weighted random selection
+        return this.weightedRandomSelect(validPositions);
+    }
+    
+    /**
+     * Calculate how "special" a location is for item spawning
+     * Higher values = more likely to spawn items
+     */
+    calculateLocationSpecialness(x, y) {
+        let specialness = 1.0; // Base weight
+        
+        // Check for dead-end (袋小路)
+        if (this.isDeadEnd(x, y)) {
+            specialness *= 3.0; // 3x more likely in dead-ends
+        }
+        
+        // Check for corner position (部屋の角)
+        if (this.isCornerPosition(x, y)) {
+            specialness *= 2.5; // 2.5x more likely in corners
+        }
+        
+        // Check for hidden alcove (隠れた場所)
+        if (this.isHiddenAlcove(x, y)) {
+            specialness *= 2.2; // 2.2x more likely in hidden spots
+        }
+        
+        // Check for room center (部屋の中央)
+        if (this.isRoomCenter(x, y)) {
+            specialness *= 1.8; // 1.8x more likely in room centers
+        }
+        
+        // Check for corridor junction (通路の分岐点)
+        if (this.isCorridorJunction(x, y)) {
+            specialness *= 1.5; // 1.5x more likely at junctions
+        }
+        
+        // Slightly favor positions near walls (壁の近く)
+        const nearWallCount = this.countNearbyWalls(x, y);
+        if (nearWallCount >= 3) {
+            specialness *= 1.3; // 1.3x more likely near walls
+        }
+        
+        return specialness;
+    }
+    
+    /**
+     * Check if position is a dead-end (only 1 adjacent floor)
+     */
+    isDeadEnd(x, y) {
+        const adjacentFloors = this.countAdjacentFloors(x, y);
+        return adjacentFloors === 1;
+    }
+    
+    /**
+     * Check if position is in a corner (diagonally enclosed)
+     */
+    isCornerPosition(x, y) {
+        const directions = [
+            [-1, -1], [0, -1], [1, -1],
+            [-1,  0],          [1,  0],
+            [-1,  1], [0,  1], [1,  1]
+        ];
+        
+        let wallCount = 0;
+        let floorCount = 0;
+        
+        for (const [dx, dy] of directions) {
+            const checkX = x + dx;
+            const checkY = y + dy;
+            
+            if (!this.dungeon.isInBounds(checkX, checkY)) {
+                wallCount++;
+                continue;
+            }
+            
+            const tile = this.dungeon.getTile(checkX, checkY);
+            if (tile.type === 'wall') {
+                wallCount++;
+            } else if (tile.type === 'floor') {
+                floorCount++;
+            }
+        }
+        
+        // Corner if mostly surrounded by walls but has some floor access
+        return wallCount >= 5 && floorCount >= 2;
+    }
+    
+    /**
+     * Check if position is a hidden alcove (3 sides walled)
+     */
+    isHiddenAlcove(x, y) {
+        const cardinalDirections = [
+            [0, -1], [1, 0], [0, 1], [-1, 0] // N, E, S, W
+        ];
+        
+        let wallCount = 0;
+        for (const [dx, dy] of cardinalDirections) {
+            const checkX = x + dx;
+            const checkY = y + dy;
+            
+            if (!this.dungeon.isInBounds(checkX, checkY)) {
+                wallCount++;
+                continue;
+            }
+            
+            const tile = this.dungeon.getTile(checkX, checkY);
+            if (tile.type === 'wall') {
+                wallCount++;
+            }
+        }
+        
+        return wallCount >= 3; // 3 or 4 sides walled
+    }
+    
+    /**
+     * Check if position is near the center of a room
+     */
+    isRoomCenter(x, y) {
+        for (const room of this.dungeon.rooms) {
+            const centerX = room.x + Math.floor(room.width / 2);
+            const centerY = room.y + Math.floor(room.height / 2);
+            
+            // Within 2 tiles of room center
+            const distance = Math.abs(x - centerX) + Math.abs(y - centerY);
+            if (distance <= 2 && this.isInRoom(x, y, room)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Check if position is at a corridor junction (3+ adjacent floors)
+     */
+    isCorridorJunction(x, y) {
+        const adjacentFloors = this.countAdjacentFloors(x, y);
+        return adjacentFloors >= 3 && !this.isInAnyRoom(x, y);
+    }
+    
+    /**
+     * Count adjacent floor tiles (4-directional)
+     */
+    countAdjacentFloors(x, y) {
+        const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+        let count = 0;
+        
+        for (const [dx, dy] of directions) {
+            const checkX = x + dx;
+            const checkY = y + dy;
+            
+            if (this.dungeon.isInBounds(checkX, checkY)) {
+                const tile = this.dungeon.getTile(checkX, checkY);
+                if (tile.type === 'floor') {
+                    count++;
+                }
+            }
+        }
+        
+        return count;
+    }
+    
+    /**
+     * Count nearby wall tiles (8-directional)
+     */
+    countNearbyWalls(x, y) {
+        const directions = [
+            [-1, -1], [0, -1], [1, -1],
+            [-1,  0],          [1,  0],
+            [-1,  1], [0,  1], [1,  1]
+        ];
+        
+        let count = 0;
+        for (const [dx, dy] of directions) {
+            const checkX = x + dx;
+            const checkY = y + dy;
+            
+            if (!this.dungeon.isInBounds(checkX, checkY)) {
+                count++; // Out of bounds counts as wall
+                continue;
+            }
+            
+            const tile = this.dungeon.getTile(checkX, checkY);
+            if (tile.type === 'wall') {
+                count++;
+            }
+        }
+        
+        return count;
+    }
+    
+    /**
+     * Check if position is inside a specific room
+     */
+    isInRoom(x, y, room) {
+        return x >= room.x && x < room.x + room.width &&
+               y >= room.y && y < room.y + room.height;
+    }
+    
+    /**
+     * Check if position is inside any room
+     */
+    isInAnyRoom(x, y) {
+        return this.dungeon.rooms.some(room => this.isInRoom(x, y, room));
+    }
+    
+    /**
+     * Weighted random selection from positions array
+     */
+    weightedRandomSelect(positions) {
+        const totalWeight = positions.reduce((sum, pos) => sum + pos.weight, 0);
+        let random = Math.random() * totalWeight;
+        
+        for (const position of positions) {
+            random -= position.weight;
+            if (random <= 0) {
+                return { x: position.x, y: position.y };
+            }
+        }
+        
+        // Fallback to last position
+        return positions[positions.length - 1];
     }
     
     /**

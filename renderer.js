@@ -692,6 +692,9 @@ class Renderer {
     }
     
     /**
+     * Get quality and condition text for equipment
+     */
+    /**
      * Update equipment display
      */
     updateEquipmentDisplay(player) {
@@ -701,12 +704,12 @@ class Renderer {
         const weaponSlot = document.getElementById('weapon-slot');
         if (weaponSlot) {
             if (equipment.weapon) {
-                const weaponDamage = equipment.weapon.weaponDamage || '?';
-                const baseDamage = equipment.weapon.damage || 0;
-                const apText = equipment.weapon.penetration ? `, AP ${equipment.weapon.penetration}` : '';
-                const enchantDisplay = equipment.weapon.enchantment > 0 ? `+${equipment.weapon.enchantment} ` : 
-                                      equipment.weapon.enchantment < 0 ? `${equipment.weapon.enchantment} ` : '';
-                weaponSlot.textContent = `Weapon: ${enchantDisplay}${equipment.weapon.name} (${baseDamage}+d${weaponDamage}${apText})`;
+                const weapon = equipment.weapon;
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(weapon);
+                const enchantDisplay = weapon.enchantment > 0 ? `+${weapon.enchantment} ` : 
+                                      weapon.enchantment < 0 ? `${weapon.enchantment} ` : '';
+                
+                weaponSlot.textContent = `Weapon: ${enchantDisplay}${weapon.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 weaponSlot.textContent = `Weapon: None (unarmed)`;
             }
@@ -716,12 +719,12 @@ class Renderer {
         const armorSlot = document.getElementById('armor-slot');
         if (armorSlot) {
             if (equipment.armor) {
-                const enchantDisplay = equipment.armor.enchantment > 0 ? `+${equipment.armor.enchantment} ` : 
-                                      equipment.armor.enchantment < 0 ? `${equipment.armor.enchantment} ` : '';
-                // Show AC improvement and protection
-                const acBonus = equipment.armor.armorClassBonus || 0;
-                const protectionText = equipment.armor.protection ? `, DR ${equipment.armor.protection}` : '';
-                armorSlot.textContent = `Armor: ${enchantDisplay}${equipment.armor.name} (AC -${acBonus}${protectionText})`;
+                const armor = equipment.armor;
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(armor);
+                const enchantDisplay = armor.enchantment > 0 ? `+${armor.enchantment} ` : 
+                                      armor.enchantment < 0 ? `${armor.enchantment} ` : '';
+                
+                armorSlot.textContent = `Armor: ${enchantDisplay}${armor.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 armorSlot.textContent = `Armor: None`;
             }
@@ -731,11 +734,12 @@ class Renderer {
         const shieldSlot = document.getElementById('shield-slot');
         if (shieldSlot) {
             if (equipment.shield) {
-                const enchantDisplay = equipment.shield.enchantment > 0 ? `+${equipment.shield.enchantment} ` : 
-                                      equipment.shield.enchantment < 0 ? `${equipment.shield.enchantment} ` : '';
-                // Show shield block chance only
-                const blockText = equipment.shield.blockChance ? `BC ${equipment.shield.blockChance}%` : '';
-                shieldSlot.textContent = `Shield: ${enchantDisplay}${equipment.shield.name} (${blockText})`;
+                const shield = equipment.shield;
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(shield);
+                const enchantDisplay = shield.enchantment > 0 ? `+${shield.enchantment} ` : 
+                                      shield.enchantment < 0 ? `${shield.enchantment} ` : '';
+                
+                shieldSlot.textContent = `Shield: ${enchantDisplay}${shield.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 shieldSlot.textContent = `Shield: None`;
             }
@@ -745,10 +749,10 @@ class Renderer {
         const helmetSlot = document.getElementById('helmet-slot');
         if (helmetSlot) {
             if (equipment.helmet) {
-                const stats = [];
-                if (equipment.helmet.armorClassBonus) stats.push(`AC -${equipment.helmet.armorClassBonus}`);
-                if (equipment.helmet.protection) stats.push(`DR ${equipment.helmet.protection}`);
-                helmetSlot.textContent = `Helmet: ${equipment.helmet.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
+                const helmet = equipment.helmet;
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(helmet);
+                
+                helmetSlot.textContent = `Helmet: ${helmet.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 helmetSlot.textContent = `Helmet: None`;
             }
@@ -758,11 +762,10 @@ class Renderer {
         const glovesSlot = document.getElementById('gloves-slot');
         if (glovesSlot) {
             if (equipment.gloves) {
-                const stats = [];
-                if (equipment.gloves.toHitBonus) stats.push(`To Hit ${equipment.gloves.toHitBonus >= 0 ? '+' : ''}${equipment.gloves.toHitBonus}`);
-                if (equipment.gloves.armorClassBonus) stats.push(`AC -${equipment.gloves.armorClassBonus}`);
-                if (equipment.gloves.protection) stats.push(`DR ${equipment.gloves.protection}`);
-                glovesSlot.textContent = `Gloves: ${equipment.gloves.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
+                const gloves = equipment.gloves;
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(gloves);
+                
+                glovesSlot.textContent = `Gloves: ${gloves.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 glovesSlot.textContent = `Gloves: None`;
             }
@@ -772,10 +775,10 @@ class Renderer {
         const bootsSlot = document.getElementById('boots-slot');
         if (bootsSlot) {
             if (equipment.boots) {
-                const stats = [];
-                if (equipment.boots.armorClassBonus) stats.push(`AC -${equipment.boots.armorClassBonus}`);
-                if (equipment.boots.protection) stats.push(`DR ${equipment.boots.protection}`);
-                bootsSlot.textContent = `Boots: ${equipment.boots.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
+                const boots = equipment.boots;
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(boots);
+                
+                bootsSlot.textContent = `Boots: ${boots.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 bootsSlot.textContent = `Boots: None`;
             }
@@ -785,11 +788,12 @@ class Renderer {
         const ringSlot = document.getElementById('ring-slot');
         if (ringSlot) {
             if (equipment.ring) {
-                const stats = [];
-                if (equipment.ring.toHitBonus) stats.push(`To Hit ${equipment.ring.toHitBonus >= 0 ? '+' : ''}${equipment.ring.toHitBonus}`);
-                if (equipment.ring.armorClassBonus) stats.push(`AC -${equipment.ring.armorClassBonus}`);
-                if (equipment.ring.protection) stats.push(`DR ${equipment.ring.protection}`);
-                ringSlot.textContent = `Ring: ${equipment.ring.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
+                const ring = equipment.ring;
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(ring);
+                const enchantDisplay = ring.enchantment > 0 ? `+${ring.enchantment} ` : 
+                                      ring.enchantment < 0 ? `${ring.enchantment} ` : '';
+                
+                ringSlot.textContent = `Ring: ${enchantDisplay}${ring.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 ringSlot.textContent = `Ring: None`;
             }
@@ -799,11 +803,12 @@ class Renderer {
         const amuletSlot = document.getElementById('amulet-slot');
         if (amuletSlot) {
             if (equipment.amulet) {
-                const stats = [];
-                if (equipment.amulet.toHitBonus) stats.push(`To Hit ${equipment.amulet.toHitBonus >= 0 ? '+' : ''}${equipment.amulet.toHitBonus}`);
-                if (equipment.amulet.armorClassBonus) stats.push(`AC -${equipment.amulet.armorClassBonus}`);
-                if (equipment.amulet.protection) stats.push(`DR ${equipment.amulet.protection}`);
-                amuletSlot.textContent = `Amulet: ${equipment.amulet.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
+                const amulet = equipment.amulet;
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(amulet);
+                const enchantDisplay = amulet.enchantment > 0 ? `+${amulet.enchantment} ` : 
+                                      amulet.enchantment < 0 ? `${amulet.enchantment} ` : '';
+                
+                amuletSlot.textContent = `Amulet: ${enchantDisplay}${amulet.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 amuletSlot.textContent = `Amulet: None`;
             }

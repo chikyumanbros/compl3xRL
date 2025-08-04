@@ -802,6 +802,46 @@ class Game {
                         // Recreate item based on its class type
                         switch (itemInfo.itemClass) {
                             case 'EquipmentItem':
+                                // Check if this is an old format item (missing quality/durability)
+                                if (!itemInfo.quality && itemInfo.type !== 'potion' && itemInfo.type !== 'food') {
+                                    // Try to recreate using EquipmentManager to get new properties
+                                    const categoryMap = {
+                                        'weapon': 'weapons',
+                                        'armor': 'armor', 
+                                        'shield': 'shields',
+                                        'helmet': 'helmets',
+                                        'gloves': 'gloves',
+                                        'boots': 'boots',
+                                        'ring': 'rings',
+                                        'amulet': 'amulets'
+                                    };
+                                    
+                                    const category = categoryMap[itemInfo.type];
+                                    if (category && typeof EquipmentManager !== 'undefined') {
+                                        // Find the item key that matches this item's name
+                                        const equipmentTypes = EQUIPMENT_TYPES[category];
+                                        if (equipmentTypes) {
+                                            const itemKey = Object.keys(equipmentTypes).find(key => 
+                                                equipmentTypes[key].name === itemInfo.name
+                                            );
+                                            
+                                            if (itemKey) {
+                                                const enchantment = itemInfo.enchantment || 0;
+                                                item = EquipmentManager.createEquipment(category, itemKey, enchantment);
+                                                if (item) {
+                                                    // Preserve position and visibility state
+                                                    item.x = itemInfo.x;
+                                                    item.y = itemInfo.y;
+                                                    item.hasBeenSeen = itemInfo.hasBeenSeen;
+                                                    item.lastSeenTurn = itemInfo.lastSeenTurn;
+                                                    console.log(`Converted old format item: ${itemInfo.name} to new format with quality: ${item.quality}`);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                // Fallback to original creation if conversion fails
                                 item = new EquipmentItem(itemInfo.name, itemInfo);
                                 break;
                             case 'FoodItem':

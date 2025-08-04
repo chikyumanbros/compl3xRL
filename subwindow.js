@@ -230,6 +230,33 @@ class SubWindow {
             properties.push(`Quantity: ${item.quantity}/${item.maxStackSize || 99}`);
         }
         
+        // Quality
+        if (item.quality) {
+            const qualityNames = {
+                'poor': 'Poor',
+                'normal': 'Normal', 
+                'fine': 'Fine',
+                'masterwork': 'Masterwork',
+                'legendary': 'Legendary'
+            };
+            properties.push(`Quality: ${qualityNames[item.quality] || item.quality}`);
+        }
+        
+        // Durability (if equipment has durability system)
+        if (item.getDurabilityState && item.maxDurability) {
+            const durabilityRatio = item.currentDurability / item.maxDurability;
+            const durabilityPercent = Math.floor(durabilityRatio * 100);
+            const state = item.getDurabilityState();
+            const stateNames = {
+                'normal': 'Excellent',
+                'cracked1': 'Good',
+                'cracked2': 'Fair',
+                'cracked3': 'Poor',
+                'broken': 'Broken'
+            };
+            properties.push(`Condition: ${stateNames[state]} (${durabilityPercent}%)`);
+        }
+        
         // Enchantment
         if (item.enchantment && item.enchantment !== 0) {
             properties.push(`Enchantment: ${item.enchantment > 0 ? '+' : ''}${item.enchantment}`);
@@ -290,23 +317,15 @@ class SubWindow {
             
             if (equipment[slot.key]) {
                 const item = equipment[slot.key];
-                let statsText = '';
-                if (item.damage) {
-                    const weaponDamage = item.weaponDamage || item.damage || '?';
-                    const apText = item.penetration ? `, AP ${item.penetration}` : '';
-                    statsText = ` (${item.damage}+d${weaponDamage}${apText})`;
-                } else if (item.armorClassBonus) {
-                    if (item.type === 'shield') {
-                        // Shields only show BC
-                        const blockText = item.blockChance ? `BC ${item.blockChance}%` : '';
-                        statsText = ` (${blockText})`;
-                    } else {
-                        // Other armor shows AC and DR
-                        const protectionText = item.protection ? `, DR ${item.protection}` : '';
-                        statsText = ` (AC -${item.armorClassBonus}${protectionText})`;
-                    }
-                }
-                slotDiv.innerHTML = `<span style="color: #00ff00;">${slot.name} ${slot.keyHint}:</span> ${item.name}${statsText}`;
+                
+                // Use unified display logic from Player class
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(item);
+                
+                // Add weight information like inventory
+                const totalWeight = item.getTotalWeight ? item.getTotalWeight() : (item.weight * (item.quantity || 1));
+                const weightText = totalWeight === 1 ? '1 lb' : `${totalWeight} lbs`;
+                
+                slotDiv.innerHTML = `<span style="color: #00ff00;">${slot.name} ${slot.keyHint}:</span> ${item.name}${qualityText}${conditionText}${statsText} (${weightText})`;
             } else {
                 slotDiv.innerHTML = `<span style="color: #808080;">${slot.name} ${slot.keyHint}:</span> <span style="color: #404040;">None</span>`;
             }
@@ -454,10 +473,51 @@ class SubWindow {
             if (item.blockChance) properties.push(`Block Chance: ${item.blockChance}%`);
         }
         
-        // Quality and enchantment
-        if (item.quality && item.quality !== 'normal') {
-            properties.push(`Quality: ${item.quality}`);
+        // Quality (always show for equipment)
+        if (item.quality) {
+            const qualityNames = {
+                'poor': 'Poor',
+                'normal': 'Normal', 
+                'fine': 'Fine',
+                'masterwork': 'Masterwork',
+                'legendary': 'Legendary'
+            };
+            properties.push(`Quality: ${qualityNames[item.quality] || item.quality}`);
         }
+        
+        // Durability condition (if equipment has durability system)
+        if (item.getDurabilityState && item.maxDurability) {
+            const durabilityRatio = item.currentDurability / item.maxDurability;
+            const durabilityPercent = Math.floor(durabilityRatio * 100);
+            const state = item.getDurabilityState();
+            const stateNames = {
+                'normal': 'Excellent',
+                'cracked1': 'Good',
+                'cracked2': 'Fair',
+                'cracked3': 'Poor',
+                'broken': 'Broken'
+            };
+            properties.push(`Condition: ${stateNames[state]} (${durabilityPercent}%)`);
+            
+            // Show effective stats if damaged
+            if (state !== 'normal') {
+                const effectiveStats = item.getEffectiveStats();
+                if (item.damage > 0 && effectiveStats.damage !== item.damage) {
+                    properties.push(`Effective Damage: 1d${effectiveStats.weaponDamage}+${effectiveStats.damage} (reduced from base)`);
+                }
+                if (item.armorClassBonus > 0 && effectiveStats.armorClassBonus !== item.armorClassBonus) {
+                    properties.push(`Effective AC: -${effectiveStats.armorClassBonus} (reduced from -${item.armorClassBonus})`);
+                }
+                if (item.protection > 0 && effectiveStats.protection !== item.protection) {
+                    properties.push(`Effective DR: ${effectiveStats.protection} (reduced from ${item.protection})`);
+                }
+                if (item.blockChance > 0 && effectiveStats.blockChance !== item.blockChance) {
+                    properties.push(`Effective BC: ${effectiveStats.blockChance}% (reduced from ${item.blockChance}%)`);
+                }
+            }
+        }
+        
+        // Enchantment
         if (item.enchantment && item.enchantment !== 0) {
             properties.push(`Enchantment: ${item.enchantment > 0 ? '+' : ''}${item.enchantment}`);
         }

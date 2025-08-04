@@ -409,7 +409,6 @@ class Player {
                 console.warn('Failed to create starting healing potion');
             }
             
-            
         } else {
             console.error('EquipmentManager not available - falling back to basic items');
             // Fallback to basic items if EquipmentManager is not loaded
@@ -473,16 +472,33 @@ class Player {
         
         // Shield Block Chance check (after damage reduction calculation)
         const blockChance = this.getBlockChance();
+        let blockedAttack = false;
         if (blockChance > 0 && finalDamage > 0) {
             const blockRoll = Math.floor(Math.random() * 100) + 1; // 1-100
             if (blockRoll <= blockChance) {
                 // Successful block!
-        if (window.game && window.game.renderer) {
+                blockedAttack = true;
+                if (window.game && window.game.renderer) {
                     window.game.renderer.addBattleLogMessage(
                         `You block the attack with your shield! (${blockRoll} ≤ ${blockChance}% BC)`, 
                         'victory'
                     );
                 }
+                
+                // Check shield durability after successful block
+                if (this.equipment.shield) {
+                    const broke = this.equipment.shield.takeDurabilityDamage(1, 'block');
+                    if (broke) {
+                        if (window.game && window.game.renderer) {
+                            window.game.renderer.addBattleLogMessage(
+                                `Your ${this.equipment.shield.name} breaks from blocking!`, 
+                                'warning'
+                            );
+                        }
+                        this.updateCombatStats(); // Recalculate stats after shield breaks
+                    }
+                }
+                
                 finalDamage = 0; // Completely blocked
             } else {
                 // Failed block
@@ -498,6 +514,11 @@ class Player {
         const oldHpPercent = this.hp / this.maxHp;
         this.hp -= finalDamage;
         const newHpPercent = this.hp / this.maxHp;
+        
+        // Check armor durability if damage was taken (not blocked)
+        if (finalDamage > 0 && !blockedAttack) {
+            this.checkArmorDurability(finalDamage);
+        }
         
         // Add HP status to battle log (only if damage was actually taken)
         if (window.game && window.game.renderer) {
@@ -565,6 +586,21 @@ class Player {
             
             monster.takeDamage(finalDamage, this.penetration);
             
+            // Check weapon durability after successful attack
+            if (this.equipment.weapon) {
+                const usageType = naturalRoll === 20 ? 'critical' : 'normal';
+                const broke = this.equipment.weapon.takeDurabilityDamage(1, usageType);
+                if (broke) {
+                    if (window.game && window.game.renderer) {
+                        window.game.renderer.addBattleLogMessage(
+                            `Your ${this.equipment.weapon.name} breaks from the attack!`, 
+                            'warning'
+                        );
+                    }
+                    this.updateCombatStats(); // Recalculate stats after weapon breaks
+                }
+            }
+            
             if (!monster.isAlive) {
                 if (window.game && window.game.renderer) {
                     window.game.renderer.addBattleLogMessage(`You defeat the ${monster.name}!`, 'victory');
@@ -598,6 +634,42 @@ class Player {
             const encumbrance = this.getEncumbranceLevel();
             const combatCost = this.getCombatHungerCost(encumbrance);
             this.consumeNutrition(combatCost);
+        }
+    }
+    
+    /**
+     * Check armor durability when damage is taken
+     */
+    checkArmorDurability(damageAmount) {
+        let needsStatsUpdate = false;
+        
+        // Check all equipped armor pieces
+        const armorSlots = ['armor', 'helmet', 'gloves', 'boots'];
+        
+        for (const slot of armorSlots) {
+            if (this.equipment[slot]) {
+                const armor = this.equipment[slot];
+                
+                // Higher damage increases chance of durability loss
+                const damageChance = Math.min(0.3, damageAmount * 0.02); // Max 30% chance
+                if (Math.random() < damageChance) {
+                    const broke = armor.takeDurabilityDamage(1, 'normal');
+                    if (broke) {
+                        if (window.game && window.game.renderer) {
+                            window.game.renderer.addBattleLogMessage(
+                                `Your ${armor.name} breaks from the damage!`, 
+                                'warning'
+                            );
+                        }
+                        needsStatsUpdate = true;
+                    }
+                }
+            }
+        }
+        
+        // Update stats if any armor broke
+        if (needsStatsUpdate) {
+            this.updateCombatStats();
         }
     }
     
@@ -776,28 +848,193 @@ class Player {
     }
     
     /**
-     * Initialize minimal starting equipment (True Classic Roguelike)
+     * Force reset equipment to new format (for debugging/fixing)
      */
-    initializeEquipment() {
-        // Start with basic dagger using EquipmentManager
-        if (typeof EquipmentManager !== 'undefined') {
-            this.equipment.weapon = EquipmentManager.createEquipment('weapons', 'dagger');
-        } else {
-            // Fallback if EquipmentManager not available
-        this.equipment.weapon = {
-            name: 'Dagger',
-            type: 'weapon',
-            damage: 1,
-            weaponDamage: 4, // d4
-            toHitBonus: 0,
-                penetration: 1, // Light armor piercing
-                weight: 10, // Light starting weapon
-                description: 'A simple iron dagger. Better than bare hands. (1d4+1 damage, AP 1)'
+    resetEquipmentToNewFormat() {
+        console.log('Resetting equipment to new format...');
+        
+        // Clear all equipment
+        this.equipment = {
+            weapon: null,
+            armor: null,
+            shield: null,
+            helmet: null,
+            gloves: null,
+            boots: null,
+            ring: null,
+            amulet: null
         };
+        
+        // Reinitialize with new format
+        this.initializeEquipment();
+        
+        console.log('Equipment reset complete. New equipment:', this.equipment);
+    }
+    
+    /**
+     * Get unified equipment display information (used across all UIs)
+     */
+    static getEquipmentDisplayInfo(item) {
+        let qualityText = '';
+        let conditionText = '';
+        let statsText = '';
+        
+        // Check if this looks like equipment by name patterns and properties
+        const isEquipment = item.type === 'weapon' || item.type === 'armor' || item.type === 'shield' ||
+                           item.type === 'helmet' || item.type === 'gloves' || item.type === 'boots' ||
+                           item.type === 'ring' || item.type === 'amulet' ||
+                           item.damage || item.armorClassBonus || item.blockChance || item.toHitBonus ||
+                           item.penetration || item.protection;
+        
+        if (isEquipment) {
+            // Always show quality for equipment-like items
+            const quality = item.quality || 'normal';
+            const qualityAbbrev = {
+                'poor': 'Poor',
+                'normal': 'Normal',
+                'fine': 'Fine',
+                'masterwork': 'Master',
+                'legendary': 'Legend'
+            };
+            const qualityName = qualityAbbrev[quality] || 'Normal';
+            qualityText = ` (${qualityName})`;
+            
+            // Show condition for durability-capable items
+            const canHaveDurability = item.type === 'weapon' || item.type === 'armor' || item.type === 'shield' ||
+                                     item.type === 'helmet' || item.type === 'gloves' || item.type === 'boots' ||
+                                     item.damage || item.armorClassBonus || item.blockChance;
+            
+            if (canHaveDurability) {
+                let state = 'normal';
+                if (item.getDurabilityState && item.maxDurability) {
+                    state = item.getDurabilityState();
+                }
+                
+                const conditionAbbrev = {
+                    'normal': ' [Excellent]',
+                    'cracked1': ' [Good]',
+                    'cracked2': ' [Fair]',
+                    'cracked3': ' [Poor]',
+                    'broken': ' [BROKEN]'
+                };
+                conditionText = conditionAbbrev[state] || ' [Good]';
+            }
+            
+            // Get effective stats using same logic everywhere
+            const effectiveStats = (item.getEffectiveStats && typeof item.getEffectiveStats === 'function') ? 
+                                   item.getEffectiveStats() : item;
+            
+            if (item.type === 'weapon') {
+                const weaponDamage = effectiveStats.weaponDamage || '?';
+                const apText = effectiveStats.penetration ? `, AP ${effectiveStats.penetration}` : '';
+                const damage = effectiveStats.damage || 0;
+                statsText = ` [${damage}+d${weaponDamage}${apText}]`;
+            } else if (item.type === 'armor') {
+                const stats = [];
+                if (effectiveStats.armorClassBonus) stats.push(`AC -${effectiveStats.armorClassBonus}`);
+                if (effectiveStats.protection) stats.push(`DR ${effectiveStats.protection}`);
+                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
+            } else if (item.type === 'shield') {
+                const stats = [];
+                if (effectiveStats.blockChance) stats.push(`BC ${effectiveStats.blockChance}%`);
+                if (effectiveStats.armorClassBonus) stats.push(`AC -${effectiveStats.armorClassBonus}`);
+                if (effectiveStats.protection) stats.push(`DR ${effectiveStats.protection}`);
+                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
+            } else if (item.type === 'helmet') {
+                const stats = [];
+                if (effectiveStats.armorClassBonus) stats.push(`AC -${effectiveStats.armorClassBonus}`);
+                if (effectiveStats.protection) stats.push(`DR ${effectiveStats.protection}`);
+                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
+            } else if (item.type === 'gloves') {
+                const stats = [];
+                if (effectiveStats.armorClassBonus) stats.push(`AC -${effectiveStats.armorClassBonus}`);
+                if (effectiveStats.toHitBonus) stats.push(`To Hit ${effectiveStats.toHitBonus >= 0 ? '+' : ''}${effectiveStats.toHitBonus}`);
+                if (effectiveStats.protection) stats.push(`DR ${effectiveStats.protection}`);
+                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
+            } else if (item.type === 'boots') {
+                const stats = [];
+                if (effectiveStats.armorClassBonus) stats.push(`AC -${effectiveStats.armorClassBonus}`);
+                if (effectiveStats.protection) stats.push(`DR ${effectiveStats.protection}`);
+                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
+            } else if (item.type === 'ring') {
+                const stats = [];
+                if (effectiveStats.armorClassBonus) stats.push(`AC -${effectiveStats.armorClassBonus}`);
+                if (effectiveStats.toHitBonus) stats.push(`To Hit ${effectiveStats.toHitBonus >= 0 ? '+' : ''}${effectiveStats.toHitBonus}`);
+                if (effectiveStats.protection) stats.push(`DR ${effectiveStats.protection}`);
+                if (effectiveStats.penetration) stats.push(`AP ${effectiveStats.penetration}`);
+                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
+            } else if (item.type === 'amulet') {
+                const stats = [];
+                if (effectiveStats.armorClassBonus) stats.push(`AC -${effectiveStats.armorClassBonus}`);
+                if (effectiveStats.toHitBonus) stats.push(`To Hit ${effectiveStats.toHitBonus >= 0 ? '+' : ''}${effectiveStats.toHitBonus}`);
+                if (effectiveStats.protection) stats.push(`DR ${effectiveStats.protection}`);
+                if (effectiveStats.penetration) stats.push(`AP ${effectiveStats.penetration}`);
+                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
+            }
         }
         
-        // Option 2: True hardcore - start unarmed (uncomment below for maximum difficulty)
-        // this.equipment.weapon = null;
+        return { qualityText, conditionText, statsText };
+    }
+    
+    /**
+     * Convert inventory items to new format
+     */
+    convertInventoryToNewFormat() {
+        let conversionsCount = 0;
+        
+        this.inventory = this.inventory.map(item => {
+            // Skip if already new format or not equipment
+            if (!item || item.getDurabilityState || item.type === 'potion' || item.type === 'food') {
+                return item;
+            }
+            
+            // Try to convert using EquipmentManager
+            if (typeof EquipmentManager !== 'undefined' && typeof EQUIPMENT_TYPES !== 'undefined') {
+                const categoryMap = {
+                    'weapon': 'weapons',
+                    'armor': 'armor', 
+                    'shield': 'shields',
+                    'helmet': 'helmets',
+                    'gloves': 'gloves',
+                    'boots': 'boots',
+                    'ring': 'rings',
+                    'amulet': 'amulets'
+                };
+                
+                const category = categoryMap[item.type];
+                if (category) {
+                    const equipmentTypes = EQUIPMENT_TYPES[category];
+                    if (equipmentTypes) {
+                        const itemKey = Object.keys(equipmentTypes).find(key => 
+                            equipmentTypes[key].name === item.name
+                        );
+                        
+                        if (itemKey) {
+                            const enchantment = item.enchantment || 0;
+                            const newItem = EquipmentManager.createEquipment(category, itemKey, enchantment);
+                            if (newItem) {
+                                conversionsCount++;
+                                console.log(`Converted inventory item: ${item.name} to new format with quality: ${newItem.quality}`);
+                                return newItem;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return item; // Return original if conversion fails
+        });
+        
+        console.log(`Converted ${conversionsCount} inventory items to new format`);
+        return conversionsCount;
+    }
+    
+    /**
+     * Initialize minimal starting equipment (True Classic Roguelike)
+     */
+        initializeEquipment() {
+        // Start unarmed for true classic roguelike experience
+        this.equipment.weapon = null;
         
         // No starting armor (classic harsh start)
         this.equipment.armor = null;
@@ -813,9 +1050,56 @@ class Player {
     }
     
     /**
+     * Convert old equipment format to new EquipmentItem instances
+     */
+    convertEquipmentToNewFormat() {
+        for (const [slot, item] of Object.entries(this.equipment)) {
+            if (item && !item.getDurabilityState) {
+                // This is an old format item, convert it
+                console.log(`Converting ${slot} equipment to new format:`, item);
+                
+                if (typeof EquipmentManager !== 'undefined') {
+                    // Try to find matching equipment type
+                    let newItem = null;
+                    
+                    if (item.type === 'weapon') {
+                        // Try to match by name
+                        const weaponKeys = Object.keys(EQUIPMENT_TYPES.weapons);
+                        const matchingKey = weaponKeys.find(key => 
+                            EQUIPMENT_TYPES.weapons[key].name.toLowerCase() === item.name.toLowerCase()
+                        );
+                        
+                        if (matchingKey) {
+                            newItem = EquipmentManager.createEquipment('weapons', matchingKey, item.enchantment || 0, {
+                                quality: item.quality || 'fine'
+                            });
+                        }
+                    }
+                    
+                    if (newItem) {
+                        this.equipment[slot] = newItem;
+                        console.log(`Successfully converted ${slot}:`, newItem);
+                    } else {
+                        // Create a basic EquipmentItem if no match found
+                        this.equipment[slot] = new EquipmentItem(item.name, {
+                            ...item,
+                            quality: item.quality || 'fine'
+                        });
+                        console.log(`Created basic EquipmentItem for ${slot}:`, this.equipment[slot]);
+                    }
+                } else {
+                    console.warn('EquipmentManager not available for conversion');
+                }
+            }
+        }
+    }
+    
+    /**
      * Update combat stats based on equipped items
      */
     updateCombatStats() {
+        // Convert old equipment format if needed
+        this.convertEquipmentToNewFormat();
         // Base stats (Classic Roguelike - AD&D style)
         this.baseToHit = this.getClassicModifier(this.strength) + this.level; // STR modifier + level
         this.armorClass = 10 - this.getClassicModifier(this.dexterity); // Lower AC is better
@@ -824,12 +1108,13 @@ class Player {
         this.baseDamage = this.getClassicModifier(this.strength); // STR modifier for damage
         this.weaponDamage = 4; // Basic starting weapon (d4 dagger)
         
-        // Apply weapon bonuses
+        // Apply weapon bonuses (considering durability)
         if (this.equipment.weapon) {
+            const weaponStats = this.equipment.weapon.getEffectiveStats();
             // Weapon damage replaces base damage, then add STR modifier
-            this.baseDamage = (this.equipment.weapon.damage || 0) + this.getClassicModifier(this.strength);
-            this.weaponDamage = this.equipment.weapon.weaponDamage || 3;
-            this.baseToHit += this.equipment.weapon.toHitBonus || 0;
+            this.baseDamage = weaponStats.damage + this.getClassicModifier(this.strength);
+            this.weaponDamage = weaponStats.weaponDamage || 3;
+            this.baseToHit += weaponStats.toHitBonus || 0;
         }
         
         // Final damage for display (minimum damage + dice damage range)
@@ -837,10 +1122,11 @@ class Player {
         this.minDamage = this.baseDamage + 1; // Min possible (dice roll 1)
         this.maxDamage = this.baseDamage + this.weaponDamage; // Max possible (max dice roll)
         
-        // Calculate weapon penetration
+        // Calculate weapon penetration (considering durability)
         this.penetration = 0;
-        if (this.equipment.weapon && this.equipment.weapon.penetration) {
-            this.penetration = this.equipment.weapon.penetration;
+        if (this.equipment.weapon) {
+            const weaponStats = this.equipment.weapon.getEffectiveStats();
+            this.penetration = weaponStats.penetration || 0;
         }
         // Add penetration from accessories
         if (this.equipment.ring && this.equipment.ring.penetration) {
@@ -850,9 +1136,10 @@ class Player {
             this.penetration += this.equipment.amulet.penetration;
         }
         
-        // Apply armor bonuses (SUBTRACT from AC - lower is better)
-        if (this.equipment.armor && this.equipment.armor.armorClassBonus) {
-            this.armorClass -= this.equipment.armor.armorClassBonus; // Lower AC is better
+        // Apply armor bonuses (SUBTRACT from AC - lower is better, considering durability)
+        if (this.equipment.armor) {
+            const armorStats = this.equipment.armor.getEffectiveStats();
+            this.armorClass -= armorStats.armorClassBonus || 0; // Lower AC is better
         }
         
         // Shields don't provide AC bonus (only BC)
@@ -860,17 +1147,20 @@ class Player {
         //     this.armorClass -= this.equipment.shield.armorClassBonus;
         // }
         
-        if (this.equipment.helmet && this.equipment.helmet.armorClassBonus) {
-            this.armorClass -= this.equipment.helmet.armorClassBonus;
+        if (this.equipment.helmet) {
+            const helmetStats = this.equipment.helmet.getEffectiveStats();
+            this.armorClass -= helmetStats.armorClassBonus || 0;
         }
         
         if (this.equipment.gloves) {
-            this.baseToHit += this.equipment.gloves.toHitBonus || 0;
-            this.armorClass -= this.equipment.gloves.armorClassBonus || 0;
+            const gloveStats = this.equipment.gloves.getEffectiveStats();
+            this.baseToHit += gloveStats.toHitBonus || 0;
+            this.armorClass -= gloveStats.armorClassBonus || 0;
         }
         
         if (this.equipment.boots) {
-            this.armorClass -= this.equipment.boots.armorClassBonus || 0;
+            const bootStats = this.equipment.boots.getEffectiveStats();
+            this.armorClass -= bootStats.armorClassBonus || 0;
         }
         
         if (this.equipment.ring) {
@@ -883,23 +1173,27 @@ class Player {
             this.armorClass -= this.equipment.amulet.armorClassBonus || 0;
         }
         
-        // Calculate total protection from all armor (Warhammer-style)
+        // Calculate total protection from all armor (Warhammer-style, considering durability)
         this.totalProtection = 0;
-        if (this.equipment.armor && this.equipment.armor.protection) {
-            this.totalProtection += this.equipment.armor.protection;
+        if (this.equipment.armor) {
+            const armorStats = this.equipment.armor.getEffectiveStats();
+            this.totalProtection += armorStats.protection || 0;
         }
         // Shields don't provide DR protection (only BC)
         // if (this.equipment.shield && this.equipment.shield.protection) {
         //     this.totalProtection += this.equipment.shield.protection;
         // }
-        if (this.equipment.helmet && this.equipment.helmet.protection) {
-            this.totalProtection += this.equipment.helmet.protection;
+        if (this.equipment.helmet) {
+            const helmetStats = this.equipment.helmet.getEffectiveStats();
+            this.totalProtection += helmetStats.protection || 0;
         }
-        if (this.equipment.gloves && this.equipment.gloves.protection) {
-            this.totalProtection += this.equipment.gloves.protection;
+        if (this.equipment.gloves) {
+            const gloveStats = this.equipment.gloves.getEffectiveStats();
+            this.totalProtection += gloveStats.protection || 0;
         }
-        if (this.equipment.boots && this.equipment.boots.protection) {
-            this.totalProtection += this.equipment.boots.protection;
+        if (this.equipment.boots) {
+            const bootStats = this.equipment.boots.getEffectiveStats();
+            this.totalProtection += bootStats.protection || 0;
         }
         if (this.equipment.ring && this.equipment.ring.protection) {
             this.totalProtection += this.equipment.ring.protection;
@@ -908,10 +1202,11 @@ class Player {
             this.totalProtection += this.equipment.amulet.protection;
         }
         
-        // Update block chance from shield
+        // Update block chance from shield (considering durability)
         this.blockChance = 0;
-        if (this.equipment.shield && this.equipment.shield.blockChance) {
-            this.blockChance = this.equipment.shield.blockChance;
+        if (this.equipment.shield) {
+            const shieldStats = this.equipment.shield.getEffectiveStats();
+            this.blockChance = shieldStats.blockChance || 0;
         }
         
         // Recalculate final to-hit after all equipment bonuses
@@ -1123,62 +1418,32 @@ class Player {
             const totalWeight = item.getTotalWeight ? item.getTotalWeight() : (item.weight * (item.quantity || 1));
             const weightText = totalWeight === 1 ? '1 lb' : `${totalWeight} lbs`;
             
-            // Add stats for equipment items
-            let statsText = '';
-            if (item.type === 'weapon' && item.damage) {
-                const weaponDamage = item.weaponDamage || item.damage || '?';
-                const apText = item.penetration ? `, AP ${item.penetration}` : '';
-                statsText = ` [${item.damage}+d${weaponDamage}${apText}]`;
-            } else if (item.type === 'armor' && item.armorClassBonus) {
-                const protectionText = item.protection ? `, DR ${item.protection}` : '';
-                statsText = ` [AC -${item.armorClassBonus}${protectionText}]`;
-            } else if (item.type === 'shield' && item.blockChance) {
-                statsText = ` [BC ${item.blockChance}%]`;
-            } else if (item.type === 'helmet' && item.armorClassBonus) {
-                const protectionText = item.protection ? `, DR ${item.protection}` : '';
-                statsText = ` [AC -${item.armorClassBonus}${protectionText}]`;
-            } else if (item.type === 'gloves') {
-                const stats = [];
-                if (item.armorClassBonus) stats.push(`AC -${item.armorClassBonus}`);
-                if (item.toHitBonus) stats.push(`To Hit ${item.toHitBonus >= 0 ? '+' : ''}${item.toHitBonus}`);
-                if (item.protection) stats.push(`DR ${item.protection}`);
-                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
-            } else if (item.type === 'boots' && item.armorClassBonus) {
-                const protectionText = item.protection ? `, DR ${item.protection}` : '';
-                statsText = ` [AC -${item.armorClassBonus}${protectionText}]`;
-            } else if (item.type === 'ring') {
-                const stats = [];
-                if (item.armorClassBonus) stats.push(`AC -${item.armorClassBonus}`);
-                if (item.toHitBonus) stats.push(`To Hit ${item.toHitBonus >= 0 ? '+' : ''}${item.toHitBonus}`);
-                if (item.protection) stats.push(`DR ${item.protection}`);
-                if (item.penetration) stats.push(`AP ${item.penetration}`);
-                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
-            } else if (item.type === 'amulet') {
-                const stats = [];
-                if (item.armorClassBonus) stats.push(`AC -${item.armorClassBonus}`);
-                if (item.toHitBonus) stats.push(`To Hit ${item.toHitBonus >= 0 ? '+' : ''}${item.toHitBonus}`);
-                if (item.protection) stats.push(`DR ${item.protection}`);
-                if (item.penetration) stats.push(`AP ${item.penetration}`);
-                if (stats.length > 0) statsText = ` [${stats.join(', ')}]`;
-            } else if (item.type === 'potion') {
-                const healStats = [];
-                if (item.healDice) {
-                    healStats.push(`Heal: ${item.healDice} HP`);
-                } else if (item.healAmount > 0) {
-                    healStats.push(`Heal: ${item.healAmount} HP`);
+            // Use unified display logic
+            const { qualityText, conditionText, statsText: equipmentStatsText } = Player.getEquipmentDisplayInfo(item);
+            
+            // Handle non-equipment items separately
+            let statsText = equipmentStatsText;
+            if (!equipmentStatsText) {
+                if (item.type === 'potion') {
+                    const healStats = [];
+                    if (item.healDice) {
+                        healStats.push(`Heal: ${item.healDice} HP`);
+                    } else if (item.healAmount > 0) {
+                        healStats.push(`Heal: ${item.healAmount} HP`);
+                    }
+                    if (healStats.length > 0) statsText = ` [${healStats.join(', ')}]`;
+                } else if (item.type === 'food') {
+                    const foodStats = [];
+                    if (item.nutrition) foodStats.push(`Nutrition: ${item.nutrition}`);
+                    if (item.healAmount > 0) foodStats.push(`Heal: ${item.healAmount} HP`);
+                    if (item.perishable) foodStats.push('Perishable');
+                    if (foodStats.length > 0) statsText = ` [${foodStats.join(', ')}]`;
                 }
-                if (healStats.length > 0) statsText = ` [${healStats.join(', ')}]`;
-            } else if (item.type === 'food') {
-                const foodStats = [];
-                if (item.nutrition) foodStats.push(`Nutrition: ${item.nutrition}`);
-                if (item.healAmount > 0) foodStats.push(`Heal: ${item.healAmount} HP`);
-                if (item.perishable) foodStats.push('Perishable');
-                if (foodStats.length > 0) statsText = ` [${foodStats.join(', ')}]`;
             }
             
             const itemText = isEquipped ? 
-                `${letter} - ${displayName}${statsText} (${weightText}) (being worn)` : 
-                `${letter} - ${displayName}${statsText} (${weightText})`;
+                `${letter} - ${displayName}${qualityText}${conditionText}${statsText} (${weightText}) (being worn)` : 
+                `${letter} - ${displayName}${qualityText}${conditionText}${statsText} (${weightText})`;
             summary.push(itemText);
         });
         return summary;
