@@ -1904,6 +1904,81 @@ class ItemManager {
     }
     
     /**
+     * Spawn starting equipment around player position (new game only)
+     */
+    spawnStartingEquipment(playerX, playerY) {
+        console.log(`Spawning starting equipment around player at (${playerX}, ${playerY})`);
+        
+        // Equipment to spawn (2-4 items)
+        const startingEquipment = [
+            () => this.createRandomWeapon(1),     // Simple weapon
+            () => this.createRandomArmor(1),      // Basic armor
+            () => this.createRandomShield(1),     // Shield
+            () => this.createRandomPotion()       // Healing potion
+        ];
+        
+        // Shuffle and select 2-3 items
+        const selectedItems = startingEquipment
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 2 + Math.floor(Math.random() * 2)); // 2-3 items
+        
+        let spawnedCount = 0;
+        
+        // Find positions around player (radius 2-3)
+        const validPositions = this.findNearbyFloorPositions(playerX, playerY, 3);
+        
+        for (let i = 0; i < selectedItems.length && i < validPositions.length; i++) {
+            const item = selectedItems[i]();
+            if (item && typeof item === 'object') {
+                const position = validPositions[i];
+                item.x = position.x;
+                item.y = position.y;
+                
+                if (typeof item.x === 'number' && typeof item.y === 'number' && item.symbol) {
+                    this.addItem(item);
+                    spawnedCount++;
+                    console.log(`Spawned starting ${item.name} at (${item.x}, ${item.y})`);
+                }
+            }
+        }
+        
+        console.log(`Spawned ${spawnedCount} starting equipment items`);
+    }
+    
+    /**
+     * Find floor positions around a center point within given radius
+     */
+    findNearbyFloorPositions(centerX, centerY, radius) {
+        const positions = [];
+        
+        // Search in expanding rings from center
+        for (let r = 1; r <= radius; r++) {
+            for (let dx = -r; dx <= r; dx++) {
+                for (let dy = -r; dy <= r; dy++) {
+                    // Skip positions already checked in smaller radius
+                    if (Math.abs(dx) < r && Math.abs(dy) < r) continue;
+                    
+                    const x = centerX + dx;
+                    const y = centerY + dy;
+                    
+                    // Check if position is valid and empty
+                    if (this.dungeon.isInBounds(x, y)) {
+                        const tile = this.dungeon.getTile(x, y);
+                        if (tile.type === 'floor' && !this.hasItemAt(x, y)) {
+                            positions.push({ x, y, distance: Math.abs(dx) + Math.abs(dy) });
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Sort by distance (closer positions first)
+        positions.sort((a, b) => a.distance - b.distance);
+        
+        return positions;
+    }
+    
+    /**
      * Find a random floor position in the dungeon with location-based weighting
      */
     getRandomFloorPosition() {
