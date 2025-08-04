@@ -1954,17 +1954,15 @@ class ItemManager {
         let specialness = 1.0; // Base weight
         let locationTypes = [];
         
-        // Debug: Count adjacent floors for dead-end detection
-        const adjacentFloors = this.countAdjacentFloors(x, y);
-        
         // Check for dead-end (袋小路) - highest priority
         if (this.isDeadEnd(x, y)) {
             specialness *= 5.0; // 5x more likely in dead-ends
             locationTypes.push('dead-end');
             
-            // Debug: Always log dead-end detection
+            // Debug: Always log dead-end detection with 8-directional info
             if (Math.random() < 0.3) { // 30% chance to log
-                console.log(`Dead-end detected at (${x}, ${y}): adjacent floors = ${adjacentFloors}`);
+                const wallCount = this.countNearbyWalls(x, y);
+                console.log(`True dead-end detected at (${x}, ${y}): 8-dir walls = ${wallCount}/8`);
             }
         }
         
@@ -2001,52 +1999,46 @@ class ItemManager {
         
         // Debug: Log high-value locations
         if (specialness > 3.0 && Math.random() < 0.2) { // Lowered threshold and increased chance
-            console.log(`Special location (${x}, ${y}): weight ${specialness.toFixed(1)}, adjacent floors: ${adjacentFloors}, types: ${locationTypes.join(', ')}`);
+            const wallCount = this.countNearbyWalls(x, y);
+            console.log(`Special location (${x}, ${y}): weight ${specialness.toFixed(1)}, 8-dir walls: ${wallCount}/8, types: ${locationTypes.join(', ')}`);
         }
         
         return specialness;
     }
     
     /**
-     * Check if position is a dead-end (only 1-2 adjacent floors in narrow passages)
+     * Check if position is a dead-end (袋小路)
+     * True dead-end: 7 out of 8 surrounding tiles are walls, only 1 is floor
      */
     isDeadEnd(x, y) {
-        const adjacentFloors = this.countAdjacentFloors(x, y);
+        const directions = [
+            [-1, -1], [0, -1], [1, -1],  // NW, N, NE
+            [-1,  0],          [1,  0],  // W,     E
+            [-1,  1], [0,  1], [1,  1]   // SW, S, SE
+        ];
         
-        // True dead-end: only 1 adjacent floor
-        if (adjacentFloors === 1) {
-            return true;
-        }
+        let floorCount = 0;
+        let wallCount = 0;
         
-        // Near dead-end: 2 adjacent floors but in a narrow passage
-        if (adjacentFloors === 2) {
-            // Check if this is at the end of a narrow corridor
-            // (not in the middle of a straight corridor)
-            const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N, E, S, W
-            let floorDirections = [];
+        for (const [dx, dy] of directions) {
+            const checkX = x + dx;
+            const checkY = y + dy;
             
-            for (let i = 0; i < directions.length; i++) {
-                const [dx, dy] = directions[i];
-                const checkX = x + dx;
-                const checkY = y + dy;
-                
-                if (this.dungeon.isInBounds(checkX, checkY)) {
-                    const tile = this.dungeon.getTile(checkX, checkY);
-                    if (tile.type === 'floor') {
-                        floorDirections.push(i);
-                    }
-                }
+            if (!this.dungeon.isInBounds(checkX, checkY)) {
+                wallCount++; // Out of bounds counts as wall
+                continue;
             }
             
-            // If the two floors are opposite each other (straight corridor), not a dead-end
-            if (floorDirections.length === 2) {
-                const [dir1, dir2] = floorDirections;
-                const isOpposite = Math.abs(dir1 - dir2) === 2;
-                return !isOpposite; // Dead-end if NOT opposite (L-shaped corner)
+            const tile = this.dungeon.getTile(checkX, checkY);
+            if (tile.type === 'floor') {
+                floorCount++;
+            } else if (tile.type === 'wall') {
+                wallCount++;
             }
         }
         
-        return false;
+        // True dead-end: exactly 1 floor tile and 7 walls around
+        return floorCount === 1 && wallCount === 7;
     }
     
     /**
@@ -2162,9 +2154,9 @@ class ItemManager {
      */
     countNearbyWalls(x, y) {
         const directions = [
-            [-1, -1], [0, -1], [1, -1],
-            [-1,  0],          [1,  0],
-            [-1,  1], [0,  1], [1,  1]
+            [-1, -1], [0, -1], [1, -1],  // NW, N, NE
+            [-1,  0],          [1,  0],  // W,     E
+            [-1,  1], [0,  1], [1,  1]   // SW, S, SE
         ];
         
         let count = 0;
