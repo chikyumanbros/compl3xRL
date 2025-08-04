@@ -1414,8 +1414,8 @@ class Player {
             // Use getDisplayName() for stacking information
             const displayName = item.getDisplayName ? item.getDisplayName() : item.name;
             
-            // Get weight information
-            const totalWeight = item.getTotalWeight ? item.getTotalWeight() : (item.weight * (item.quantity || 1));
+            // Get weight information (use effective weight for equipment)
+            const totalWeight = item.getTotalWeight ? item.getTotalWeight() : this.getItemWeight(item);
             const weightText = totalWeight === 1 ? '1 lb' : `${totalWeight} lbs`;
             
             // Use unified display logic
@@ -1703,8 +1703,10 @@ class Player {
         
         let baseWeight = 0;
         
-        // If item has explicit weight, use it
-        if (item.weight !== undefined) {
+        // Check if item has effective weight method (considers durability)
+        if (item.getEffectiveWeight && typeof item.getEffectiveWeight === 'function') {
+            baseWeight = item.getEffectiveWeight();
+        } else if (item.weight !== undefined) {
             baseWeight = item.weight;
         } else {
             // Fallback weights based on item type

@@ -437,6 +437,26 @@ class EquipmentItem extends Item {
     }
     
     /**
+     * Get effective weight considering wear and tear
+     * Damaged equipment weighs slightly less due to material loss
+     */
+    getEffectiveWeight() {
+        const state = this.getDurabilityState();
+        
+        // Weight reduction based on damage (very small amounts)
+        const weightLossMultipliers = {
+            'normal': 1.0,     // No weight loss
+            'cracked1': 0.98,  // 2% weight loss
+            'cracked2': 0.95,  // 5% weight loss  
+            'cracked3': 0.90,  // 10% weight loss
+            'broken': 0.85     // 15% weight loss (pieces falling off)
+        };
+        
+        const multiplier = weightLossMultipliers[state] || 1.0;
+        return Math.max(0.1, this.weight * multiplier); // Minimum 0.1 lbs
+    }
+    
+    /**
      * Apply durability reduction with minimum value guarantee
      * Prevents low-stat equipment from becoming completely useless when damaged
      */
@@ -468,9 +488,26 @@ class EquipmentItem extends Item {
             'leather': 1.2,   // 20% more likely
             'iron': 1.0,      // Base chance
             'steel': 0.7,     // 30% less likely
+            'silver': 1.1,    // 10% more likely (soft metal)
+            'gold': 1.3,      // 30% more likely (very soft)
+            'platinum': 0.8,  // 20% less likely
             'mithril': 0.4,   // 60% less likely
             'adamantine': 0.2 // 80% less likely
         };
+        
+        // Weapon type modifiers (bladed weapons are more fragile)
+        let weaponTypeMod = 1.0;
+        if (this.type === 'weapon') {
+            const bladedWeapons = ['dagger', 'shortsword', 'longsword', 'greatsword', 'scimitar', 
+                                   'rapier', 'battleaxe', 'handaxe', 'halberd', 'glaive'];
+            const bluntWeapons = ['club', 'mace', 'warhammer', 'maul', 'flail'];
+            
+            if (bladedWeapons.some(blade => this.name.toLowerCase().includes(blade))) {
+                weaponTypeMod = 1.3; // 30% more likely to break (edges chip, blades nick)
+            } else if (bluntWeapons.some(blunt => this.name.toLowerCase().includes(blunt))) {
+                weaponTypeMod = 0.8; // 20% less likely to break (solid construction)
+            }
+        }
         
         // Usage type modifiers
         const usageModifiers = {
@@ -497,7 +534,7 @@ class EquipmentItem extends Item {
         const usageMod = usageModifiers[usageType] || 1.0;
         const qualityMod = qualityModifiers[this.quality] || 1.0;
         
-        return baseChance * materialMod * usageMod * qualityMod * durabilityModifier;
+        return baseChance * materialMod * weaponTypeMod * usageMod * qualityMod * durabilityModifier;
     }
     
     /**

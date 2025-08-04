@@ -170,13 +170,14 @@ class SubWindow {
         
         const properties = [];
         
-        // Basic properties
+        // Basic properties (use effective weight for equipment)
         if (item.weight) {
-            const totalWeight = item.getTotalWeight ? item.getTotalWeight() : (item.weight * (item.quantity || 1));
+            const effectiveWeight = item.getEffectiveWeight ? item.getEffectiveWeight() : item.weight;
+            const totalWeight = item.getTotalWeight ? item.getTotalWeight() : (effectiveWeight * (item.quantity || 1));
             if (item.stackable && item.quantity > 1) {
-                properties.push(`Weight: ${item.weight} each (${totalWeight} total)`);
+                properties.push(`Weight: ${effectiveWeight.toFixed(1)} each (${totalWeight.toFixed(1)} total)`);
             } else {
-                properties.push(`Weight: ${item.weight}`);
+                properties.push(`Weight: ${effectiveWeight.toFixed(1)}`);
             }
         }
         if (item.value) properties.push(`Value: ${item.value} gold`);
@@ -321,9 +322,10 @@ class SubWindow {
                 // Use unified display logic from Player class
                 const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(item);
                 
-                // Add weight information like inventory
-                const totalWeight = item.getTotalWeight ? item.getTotalWeight() : (item.weight * (item.quantity || 1));
-                const weightText = totalWeight === 1 ? '1 lb' : `${totalWeight} lbs`;
+                // Add weight information like inventory (use effective weight for equipment)
+                const effectiveWeight = item.getEffectiveWeight ? item.getEffectiveWeight() : item.weight;
+                const totalWeight = item.getTotalWeight ? item.getTotalWeight() : (effectiveWeight * (item.quantity || 1));
+                const weightText = totalWeight === 1 ? '1 lb' : `${totalWeight.toFixed(1)} lbs`;
                 
                 slotDiv.innerHTML = `<span style="color: #00ff00;">${slot.name} ${slot.keyHint}:</span> ${item.name}${qualityText}${conditionText}${statsText} (${weightText})`;
             } else {
@@ -434,8 +436,11 @@ class SubWindow {
         
         const properties = [];
         
-        // Basic properties
-        if (item.weight) properties.push(`Weight: ${item.weight}`);
+        // Basic properties (use effective weight for equipment)
+        if (item.weight) {
+            const effectiveWeight = item.getEffectiveWeight ? item.getEffectiveWeight() : item.weight;
+            properties.push(`Weight: ${effectiveWeight.toFixed(1)}`);
+        }
         if (item.value) properties.push(`Value: ${item.value} gold`);
         if (item.material) properties.push(`Material: ${item.material}`);
         
