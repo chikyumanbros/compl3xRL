@@ -1019,6 +1019,20 @@ class Game {
             return;
         }
         
+        // Block input if map is open (except for map toggle and ESC)
+        if (window.mapView && window.mapView.isOpen) {
+            if (event.code === 'KeyM' || event.code === 'Escape') {
+                // Allow map toggle and ESC to close
+                if (event.code === 'KeyM' && !event.shiftKey) {
+                    event.preventDefault();
+                    window.mapView.hide();
+                }
+                return;
+            }
+            // Block all other input when map is open
+            return;
+        }
+        
         // Safety check - ensure game is properly initialized
         if (!this.player || !this.dungeon) {
 
@@ -1147,6 +1161,15 @@ class Game {
                     // Show equipment - lowercase e
                     event.preventDefault();
                     this.showEquipment();
+                }
+                break;
+            case 'KeyM':
+                // Show map - lowercase m
+                if (!event.shiftKey) {
+                    event.preventDefault();
+                    if (window.mapView) {
+                        window.mapView.toggle(this);
+                    }
                 }
                 break;
             case 'KeyW':

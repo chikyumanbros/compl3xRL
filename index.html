@@ -76,6 +76,7 @@
                             <div>Actions: . wait, o open door, c close door</div>
                             <div>Equipment: i inventory, e equipment, w wear/wield, T take off</div>
                             <div>Food: E eat food (select from menu)</div>
+                            <div>Map: m show/hide dungeon map</div>
                             <div>Levels: > go down, < go up</div>
                             <div>System: Q quit, S save (uppercase)</div>
                         </div>
@@ -115,6 +116,19 @@
                 </div>
             </div>
         </div>
+
+        <!-- Map overlay for dungeon map display -->
+        <div id="map-overlay" class="map-overlay" style="display: none;">
+            <div id="map-window" class="map-window">
+                <div class="map-header">
+                    <h3 id="map-title">Dungeon Map - Level 1</h3>
+                    <span class="map-help">Press ESC or m to close</span>
+                </div>
+                <div id="map-canvas-container" class="map-canvas-container">
+                    <canvas id="map-canvas"></canvas>
+                </div>
+            </div>
+        </div>
         
     </div>
 
@@ -127,6 +141,7 @@
     <script src="monster.js"></script>
     <script src="item.js"></script>
     <script src="subwindow.js"></script>
+    <script src="mapview.js"></script>
     <script src="game.js"></script>
 </body>
 </html> 

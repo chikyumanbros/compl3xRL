@@ -1114,7 +1114,7 @@ const EQUIPMENT_TYPES = {
             damage: 1,
             weaponDamage: 4, // d4
             penetration: 1, // Light armor piercing
-            weight: 10,
+            weight: 1,
             value: 20,
             material: 'iron',
             symbol: '|',
@@ -1129,7 +1129,7 @@ const EQUIPMENT_TYPES = {
             damage: 2,
             weaponDamage: 6, // d6
             penetration: 1, // Moderate piercing
-            weight: 25,
+            weight: 2.5,
             value: 100,
             material: 'steel',
             symbol: '|',
@@ -1144,7 +1144,7 @@ const EQUIPMENT_TYPES = {
             damage: 2,
             weaponDamage: 6, // d6
             penetration: 2, // Good armor penetration
-            weight: 30,
+            weight: 2.5,
             value: 80,
             material: 'iron',
             symbol: '(',
@@ -1161,7 +1161,7 @@ const EQUIPMENT_TYPES = {
             damage: 3,
             weaponDamage: 8, // d8
             penetration: 2, // Good penetration
-            weight: 40,
+            weight: 3.5,
             value: 150,
             material: 'steel',
             symbol: '|',
@@ -1176,7 +1176,7 @@ const EQUIPMENT_TYPES = {
             damage: 4,
             weaponDamage: 8, // d8
             penetration: 3, // High armor penetration
-            weight: 70,
+            weight: 5,
             value: 200,
             material: 'steel',
             symbol: 'D',
@@ -1193,7 +1193,7 @@ const EQUIPMENT_TYPES = {
             damage: 5,
             weaponDamage: 10, // d10
             penetration: 3, // Excellent penetration
-            weight: 60,
+            weight: 6.5,
             value: 300,
             material: 'steel',
             symbol: '\\',
@@ -1210,7 +1210,7 @@ const EQUIPMENT_TYPES = {
             damage: 1,
             weaponDamage: 4, // d4
             penetration: 0, // No armor penetration
-            weight: 20,
+            weight: 1.5,
             value: 5,
             material: 'wood',
             symbol: ')',
@@ -1225,7 +1225,7 @@ const EQUIPMENT_TYPES = {
             damage: 3,
             weaponDamage: 6, // d6
             penetration: 2, // Effective against armor
-            weight: 40,
+            weight: 3.5,
             value: 120,
             material: 'iron',
             symbol: ')',
@@ -1240,7 +1240,7 @@ const EQUIPMENT_TYPES = {
             damage: 4,
             weaponDamage: 8, // d8
             penetration: 3, // High armor penetration
-            weight: 50,
+            weight: 5,
             value: 180,
             material: 'steel',
             symbol: 'T',
@@ -1255,7 +1255,7 @@ const EQUIPMENT_TYPES = {
             damage: 6,
             weaponDamage: 12, // d12
             penetration: 4, // Maximum armor penetration
-            weight: 100,
+            weight: 6.5,
             value: 350,
             material: 'steel',
             symbol: 'T',
@@ -1272,7 +1272,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.LIGHT_ARMOR,
             armorClassBonus: 2,
             protection: 1, // Basic damage reduction
-            weight: 50,
+            weight: 12,
             value: 100,
             material: 'leather',
             symbol: '(',
@@ -1285,7 +1285,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.LIGHT_ARMOR,
             armorClassBonus: 3,
             protection: 2, // Improved damage reduction
-            weight: 80,
+            weight: 20,
             value: 150,
             material: 'leather',
             symbol: '(',
@@ -1298,7 +1298,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.MEDIUM_ARMOR,
             armorClassBonus: 5,
             protection: 3, // Good damage reduction
-            weight: 300,
+            weight: 30,
             value: 500,
             material: 'steel',
             symbol: '[',
@@ -1311,7 +1311,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.HEAVY_ARMOR,
             armorClassBonus: 7,
             protection: 4, // Excellent damage reduction
-            weight: 450,
+            weight: 45,
             value: 1000,
             material: 'steel',
             symbol: ']',
@@ -1329,7 +1329,7 @@ const EQUIPMENT_TYPES = {
             armorClassBonus: 0, // Shields don't provide AC
             protection: 0, // Shields don't provide DR
             blockChance: 15, // 15% chance to block damage
-            weight: 35,
+            weight: 6,
             value: 50,
             material: 'wood',
             symbol: ')',
@@ -1343,7 +1343,7 @@ const EQUIPMENT_TYPES = {
             armorClassBonus: 0, // Shields don't provide AC
             protection: 0, // Shields don't provide DR
             blockChance: 20, // 20% chance to block damage
-            weight: 60,
+            weight: 8,
             value: 80,
             material: 'wood',
             symbol: ')',
@@ -1357,7 +1357,7 @@ const EQUIPMENT_TYPES = {
             armorClassBonus: 0, // Shields don't provide AC
             protection: 0, // Shields don't provide DR
             blockChance: 25, // 25% chance to block damage
-            weight: 150,
+            weight: 12,
             value: 200,
             material: 'steel',
             symbol: ')',
@@ -1374,7 +1374,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.HEALING_POTION,
             healDice: '2d4+2',
             healAmount: 10, // Fallback for compatibility
-            weight: 8,
+            weight: 0.8,
             value: 50,
             symbol: '!',
             color: '#FF0000',
@@ -1388,7 +1388,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.HEALING_POTION,
             healDice: '3d4+3',
             healAmount: 15, // Fallback for compatibility
-            weight: 10,
+            weight: 1.0,
             value: 100,
             symbol: '!',
             color: '#DC143C',
@@ -1401,8 +1401,8 @@ const EQUIPMENT_TYPES = {
              type: 'potion',
              category: EQUIPMENT_CATEGORIES.HEALING_POTION,
              healDice: '1d4+1',
-             healAmount: 5, // Fallback for compatibility
-             weight: 6,
+                         healAmount: 5, // Fallback for compatibility
+            weight: 0.6,
              value: 25,
              symbol: '!',
              color: '#FF69B4',
@@ -1415,8 +1415,8 @@ const EQUIPMENT_TYPES = {
              type: 'potion',
              category: EQUIPMENT_CATEGORIES.HEALING_POTION,
              healDice: '4d4+4',
-             healAmount: 20, // Fallback for compatibility
-             weight: 12,
+                         healAmount: 20, // Fallback for compatibility
+            weight: 1.2,
              value: 200,
              symbol: '!',
              color: '#8B0000',
@@ -1432,7 +1432,7 @@ const EQUIPMENT_TYPES = {
             name: 'Torch',
             type: 'light',
             category: EQUIPMENT_CATEGORIES.LIGHT_SOURCE,
-            weight: 8,
+            weight: 0.8,
             value: 5,
             material: 'wood',
             symbol: '~',
@@ -1449,7 +1449,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.LIGHT_ARMOR,
             armorClassBonus: 1,
             protection: 0,
-            weight: 15,
+            weight: 2,
             value: 25,
             material: 'leather',
             symbol: ']',
@@ -1462,7 +1462,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.MEDIUM_ARMOR,
             armorClassBonus: 2,
             protection: 1,
-            weight: 40,
+            weight: 3,
             value: 100,
             material: 'iron',
             symbol: ']',
@@ -1475,7 +1475,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.HEAVY_ARMOR,
             armorClassBonus: 3,
             protection: 2,
-            weight: 60,
+            weight: 4.5,
             value: 250,
             material: 'steel',
             symbol: ']',
@@ -1493,7 +1493,7 @@ const EQUIPMENT_TYPES = {
             armorClassBonus: 0,
             protection: 0,
             toHitBonus: 1,
-            weight: 8,
+            weight: 0.8,
             value: 20,
             material: 'leather',
             symbol: '[',
@@ -1507,7 +1507,7 @@ const EQUIPMENT_TYPES = {
             armorClassBonus: 1,
             protection: 1,
             toHitBonus: 0,
-            weight: 20,
+            weight: 1.5,
             value: 75,
             material: 'steel',
             symbol: '[',
@@ -1521,7 +1521,7 @@ const EQUIPMENT_TYPES = {
             armorClassBonus: 1,
             protection: 2,
             toHitBonus: -1,
-            weight: 35,
+            weight: 2.5,
             value: 150,
             material: 'steel',
             symbol: '[',
@@ -1538,7 +1538,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.LIGHT_ARMOR,
             armorClassBonus: 1,
             protection: 0,
-            weight: 20,
+            weight: 2.5,
             value: 30,
             material: 'leather',
             symbol: ']',
@@ -1551,7 +1551,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.MEDIUM_ARMOR,
             armorClassBonus: 1,
             protection: 1,
-            weight: 50,
+            weight: 3.5,
             value: 100,
             material: 'iron',
             symbol: ']',
@@ -1564,7 +1564,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.HEAVY_ARMOR,
             armorClassBonus: 2,
             protection: 2,
-            weight: 70,
+            weight: 4.5,
             value: 200,
             material: 'steel',
             symbol: ']',
@@ -1581,7 +1581,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.PROTECTION,
             armorClassBonus: 1,
             protection: 1,
-            weight: 1,
+            weight: 0.1,
             value: 300,
             material: 'gold',
             symbol: '=',
@@ -1593,7 +1593,7 @@ const EQUIPMENT_TYPES = {
             type: 'ring',
             category: EQUIPMENT_CATEGORIES.COMBAT,
             toHitBonus: 2,
-            weight: 1,
+            weight: 0.1,
             value: 200,
             material: 'silver',
             symbol: '=',
@@ -1607,7 +1607,7 @@ const EQUIPMENT_TYPES = {
             toHitBonus: 1,
             armorClassBonus: 1,
             penetration: 1,
-            weight: 1,
+            weight: 0.1,
             value: 500,
             material: 'platinum',
             symbol: '=',
@@ -1624,7 +1624,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.PROTECTION,
             armorClassBonus: 2,
             protection: 1,
-            weight: 5,
+            weight: 0.5,
             value: 400,
             material: 'silver',
             symbol: '"',
@@ -1637,7 +1637,7 @@ const EQUIPMENT_TYPES = {
             category: EQUIPMENT_CATEGORIES.COMBAT,
             toHitBonus: 1,
             penetration: 2,
-            weight: 5,
+            weight: 0.5,
             value: 350,
             material: 'iron',
             symbol: '"',
@@ -1651,7 +1651,7 @@ const EQUIPMENT_TYPES = {
             toHitBonus: 1,
             armorClassBonus: 1,
             protection: 1,
-            weight: 5,
+            weight: 0.5,
             value: 600,
             material: 'gold',
             symbol: '"',
@@ -1673,7 +1673,7 @@ const FOOD_TYPES = {
         color: '#8B4513',
         nutrition: 800,
         healAmount: 0,
-        weight: 2,
+        weight: 1.5,
         perishable: false
     },
     bread: {
@@ -1683,7 +1683,7 @@ const FOOD_TYPES = {
         color: '#DEB887',
         nutrition: 200,
         healAmount: 5,
-        weight: 1,
+        weight: 0.8,
         perishable: true
     },
     apple: {
@@ -1693,7 +1693,7 @@ const FOOD_TYPES = {
         color: '#FF0000',
         nutrition: 50,
         healAmount: 2,
-        weight: 1,
+        weight: 0.3,
         perishable: true
     },
     cheese: {
@@ -1703,7 +1703,7 @@ const FOOD_TYPES = {
         color: '#FFFF00',
         nutrition: 120,
         healAmount: 3,
-        weight: 1,
+        weight: 0.5,
         perishable: true
     },
     lembas: {
@@ -1713,7 +1713,7 @@ const FOOD_TYPES = {
         color: '#F0E68C',
         nutrition: 800,
         healAmount: 15,
-        weight: 1,
+        weight: 0.2,
         perishable: false
     },
     honeycake: {
@@ -1723,7 +1723,7 @@ const FOOD_TYPES = {
         color: '#FFD700',
         nutrition: 400,
         healAmount: 10,
-        weight: 2,
+        weight: 1.2,
         perishable: true
     },
     jerky: {
@@ -1733,7 +1733,7 @@ const FOOD_TYPES = {
         color: '#8B0000',
         nutrition: 300,
         healAmount: 0,
-        weight: 1,
+        weight: 0.4,
         perishable: false
     }
 };

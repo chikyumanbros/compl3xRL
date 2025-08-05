@@ -360,7 +360,7 @@ class Renderer {
         // Update weight/encumbrance status
         if (stats.encumbrance) {
             if (document.getElementById('weight-status')) {
-                document.getElementById('weight-status').textContent = `Weight: ${stats.currentWeight}/${stats.maxWeight}`;
+                document.getElementById('weight-status').textContent = `Weight: ${stats.currentWeight.toFixed(1)}/${stats.maxWeight}`;
             }
             
             const encumbranceElement = document.getElementById('encumbrance-status');

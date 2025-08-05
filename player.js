@@ -1435,7 +1435,7 @@ class Player {
             
             // Get weight information (use effective weight for equipment)
             const totalWeight = item.getTotalWeight ? item.getTotalWeight() : this.getItemWeight(item);
-            const weightText = totalWeight === 1 ? '1 lb' : `${totalWeight} lbs`;
+            const weightText = totalWeight === 1 ? '1 lb' : `${totalWeight.toFixed(1)} lbs`;
             
             // Use unified display logic
             const { qualityText, conditionText, statsText: equipmentStatsText } = Player.getEquipmentDisplayInfo(item);
@@ -1684,15 +1684,26 @@ class Player {
     }
     
     /**
-     * Calculate weight capacity based on strength (Generous classic roguelike style)
+     * Calculate weight capacity based on strength (Realistic values)
      */
     calculateWeightCapacity() {
-        // More generous formula: STR * 50 + 100 (allows for proper equipment)
-        let baseCapacity = this.strength * 50 + 100;
+        // Realistic formula based on human carrying capacity
+        // Base capacity: 30-120 lbs depending on strength
+        let baseCapacity;
         
-        // Special handling for STR 18+ (exceptional strength)
-        if (this.strength >= 18) {
-            baseCapacity = 18 * 50 + 100 + (this.strength - 18) * 100; // Extra capacity for exceptional STR
+        if (this.strength <= 8) {
+            baseCapacity = 30; // Weak: 30 lbs
+        } else if (this.strength <= 12) {
+            baseCapacity = 50; // Average: 50 lbs
+        } else if (this.strength <= 15) {
+            baseCapacity = 70; // Good: 70 lbs
+        } else if (this.strength <= 17) {
+            baseCapacity = 90; // Strong: 90 lbs
+        } else if (this.strength === 18) {
+            baseCapacity = 120; // Exceptional: 120 lbs
+        } else {
+            // Superhuman strength (19+)
+            baseCapacity = 120 + (this.strength - 18) * 30;
         }
         
         this.maxWeight = baseCapacity;
@@ -1736,7 +1747,7 @@ class Player {
         } else if (item.weight !== undefined) {
             baseWeight = item.weight;
         } else {
-            // Fallback weights based on item type
+            // Realistic fallback weights based on item type
             switch (item.type) {
                 case 'weapon':
                     baseWeight = this.getWeaponWeight(item);
@@ -1745,31 +1756,31 @@ class Player {
                     baseWeight = this.getArmorWeight(item);
                     break;
                 case 'shield':
-                    baseWeight = 30; // Reasonable shield weight
+                    baseWeight = 8; // Realistic shield weight (5-15 lbs)
                     break;
                 case 'helmet':
-                    baseWeight = 15; // Lighter helmets
+                    baseWeight = 3.5; // Realistic helmet weight (2-5 lbs)
                     break;
                 case 'gloves':
-                    baseWeight = 5; // Very light gloves
+                    baseWeight = 1; // Realistic gloves weight (0.5-2 lbs)
                     break;
                 case 'boots':
-                    baseWeight = 20; // Manageable boot weight
+                    baseWeight = 3; // Realistic boots weight (2-5 lbs)
                     break;
                 case 'ring':
-                    baseWeight = 1; // Rings are very light
+                    baseWeight = 0.1; // Rings are extremely light
                     break;
                 case 'amulet':
-                    baseWeight = 5; // Light amulets
+                    baseWeight = 0.5; // Light amulets
                     break;
                 case 'potion':
-                    baseWeight = 8; // Reasonable potion weight
+                    baseWeight = 0.8; // Realistic potion weight (0.5-1 lb)
                     break;
                 case 'food':
-                    baseWeight = 10; // Lighter food weight
+                    baseWeight = 1.5; // Realistic food ration weight (1-2 lbs)
                     break;
                 default:
-                    baseWeight = 5; // Lighter default weight
+                    baseWeight = 1; // Realistic default weight
                     break;
             }
         }
@@ -1780,39 +1791,64 @@ class Player {
     }
     
     /**
-     * Get weapon weight based on damage (reasonable classic roguelike weights)
+     * Get weapon weight based on damage (realistic weapon weights)
      */
     getWeaponWeight(weapon) {
         const baseDamage = weapon.damage || weapon.weaponDamage || 1;
-        return Math.max(3, baseDamage * 8); // 3-80 lbs range (dagger to greatsword)
+        
+        // Realistic weapon weights based on damage/type
+        if (baseDamage <= 2) {
+            return 1; // Dagger, knife: 1 lb
+        } else if (baseDamage <= 4) {
+            return 2.5; // Short sword, club: 2.5 lbs
+        } else if (baseDamage <= 6) {
+            return 3.5; // Longsword, mace: 3.5 lbs
+        } else if (baseDamage <= 8) {
+            return 5; // Battleaxe, warhammer: 5 lbs
+        } else {
+            return 6.5; // Greatsword, maul: 6.5 lbs
+        }
     }
     
     /**
-     * Get armor weight based on AC bonus (manageable armor weights)
+     * Get armor weight based on AC bonus (realistic armor weights)
      */
     getArmorWeight(armor) {
         const acBonus = Math.abs(armor.armorClassBonus) || 1; // Use absolute value since AC is negative
-        return Math.max(20, acBonus * 30); // 20-240 lbs range (leather to plate)
+        
+        // Realistic armor weights based on protection level
+        if (acBonus <= 2) {
+            return 12; // Leather armor: 12 lbs
+        } else if (acBonus <= 4) {
+            return 20; // Studded leather, padded: 20 lbs
+        } else if (acBonus <= 6) {
+            return 30; // Chain mail, scale mail: 30 lbs
+        } else if (acBonus <= 8) {
+            return 45; // Plate mail: 45 lbs
+        } else {
+            return 55; // Full plate armor: 55 lbs
+        }
     }
     
     /**
-     * Get encumbrance level and speed modifier (more forgiving thresholds)
+     * Get encumbrance level and speed modifier (realistic thresholds)
      */
     getEncumbranceLevel() {
         const ratio = this.currentWeight / this.maxWeight;
         
-        if (ratio <= 0.40) {
+        // Realistic encumbrance levels based on carrying capacity
+        if (ratio <= 0.50) {
             return { level: 'UNENCUMBERED', name: 'Unencumbered', speedPenalty: 1.0, color: '#00ff00' };
-        } else if (ratio <= 0.65) {
-            return { level: 'BURDENED', name: 'Burdened', speedPenalty: 0.95, color: '#ffff00' };
-        } else if (ratio <= 0.85) {
-            return { level: 'STRESSED', name: 'Stressed', speedPenalty: 0.85, color: '#ff8800' };
+        } else if (ratio <= 0.75) {
+            return { level: 'BURDENED', name: 'Burdened', speedPenalty: 0.90, color: '#ffff00' };
+        } else if (ratio <= 0.90) {
+            return { level: 'STRESSED', name: 'Stressed', speedPenalty: 0.75, color: '#ff8800' };
         } else if (ratio <= 1.0) {
-            return { level: 'STRAINED', name: 'Strained', speedPenalty: 0.7, color: '#ff4400' };
-        } else if (ratio <= 1.25) {
-            return { level: 'OVERTAXED', name: 'Overtaxed', speedPenalty: 0.5, color: '#ff0000' };
+            return { level: 'STRAINED', name: 'Strained', speedPenalty: 0.60, color: '#ff4400' };
+        } else if (ratio <= 1.15) {
+            return { level: 'OVERTAXED', name: 'Overtaxed', speedPenalty: 0.40, color: '#ff0000' };
         } else {
-            return { level: 'OVERLOADED', name: 'Overloaded', speedPenalty: 0.3, color: '#800000' };
+            return { level: 'OVERLOADED', name: 'Overloaded', speedPenalty: 0.25, color: '#800000' };
         }
     }
     
