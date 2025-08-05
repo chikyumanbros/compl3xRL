@@ -2498,12 +2498,22 @@ class Game {
                 
                 console.log('=== Terrain Analysis ===');
                 
-                let deadEnds = 0, corners = 0, alcoves = 0, centers = 0, junctions = 0, nearWalls = 0;
                 let totalFloors = 0;
                 let totalWeight = 0;
                 
-                // Count detailed information about dead-ends (8-directional)
-                let wallCount7 = 0, wallCount6 = 0, wallCount5 = 0;
+                // Count detailed information about locations by wall count
+                let wallCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0]; // 0-8 walls
+                let weightByWallCount = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+                let locationTypes = {
+                    'DEAD-END': 0,
+                    'VERY-ENCLOSED': 0,
+                    'ENCLOSED': 0,
+                    'CORNER': 0,
+                    'ROOM-CENTER': 0,
+                    'ROOM': 0,
+                    'NEAR-WALLS': 0,
+                    'CORRIDOR': 0
+                };
                 
                 for (let y = 0; y < this.dungeon.height; y++) {
                     for (let x = 0; x < this.dungeon.width; x++) {
@@ -2513,33 +2523,62 @@ class Game {
                             const weight = this.itemManager.calculateLocationSpecialness(x, y);
                             totalWeight += weight;
                             
-                            // Count 8-directional walls for better analysis
+                            // Count walls
                             const wallsAround = this.itemManager.countNearbyWalls(x, y);
-                            if (wallsAround === 7) wallCount7++;
-                            if (wallsAround === 6) wallCount6++;
-                            if (wallsAround === 5) wallCount5++;
+                            wallCounts[wallsAround]++;
+                            weightByWallCount[wallsAround] = weight;
                             
-                            if (this.itemManager.isDeadEnd(x, y)) deadEnds++;
-                            if (this.itemManager.isCornerPosition(x, y)) corners++;
-                            if (this.itemManager.isHiddenAlcove(x, y)) alcoves++;
-                            if (this.itemManager.isRoomCenter(x, y)) centers++;
-                            if (this.itemManager.isCorridorJunction(x, y)) junctions++;
-                            if (this.itemManager.countNearbyWalls(x, y) >= 3) nearWalls++;
+                            // Determine location type
+                            if (wallsAround >= 7) {
+                                locationTypes['DEAD-END']++;
+                            } else if (wallsAround >= 6) {
+                                locationTypes['VERY-ENCLOSED']++;
+                            } else if (wallsAround >= 5) {
+                                locationTypes['ENCLOSED']++;
+                            } else if (this.itemManager.isInAnyRoom(x, y)) {
+                                if (this.itemManager.isRoomCenter(x, y)) {
+                                    locationTypes['ROOM-CENTER']++;
+                                } else {
+                                    // Check for corner
+                                    const north = !this.dungeon.isInBounds(x, y-1) || this.dungeon.getTile(x, y-1).type === 'wall';
+                                    const south = !this.dungeon.isInBounds(x, y+1) || this.dungeon.getTile(x, y+1).type === 'wall';
+                                    const east = !this.dungeon.isInBounds(x+1, y) || this.dungeon.getTile(x+1, y).type === 'wall';
+                                    const west = !this.dungeon.isInBounds(x-1, y) || this.dungeon.getTile(x-1, y).type === 'wall';
+                                    
+                                    if ((north && east) || (north && west) || (south && east) || (south && west)) {
+                                        locationTypes['CORNER']++;
+                                    } else {
+                                        locationTypes['ROOM']++;
+                                    }
+                                }
+                            } else if (wallsAround >= 3) {
+                                locationTypes['NEAR-WALLS']++;
+                            } else {
+                                locationTypes['CORRIDOR']++;
+                            }
                         }
                     }
                 }
                 
                 console.log(`Total floor tiles: ${totalFloors}`);
-                console.log(`Tiles with 7/8 walls around: ${wallCount7} (${(wallCount7/totalFloors*100).toFixed(1)}%) - TRUE DEAD-ENDS`);
-                console.log(`Tiles with 6/8 walls around: ${wallCount6} (${(wallCount6/totalFloors*100).toFixed(1)}%)`);
-                console.log(`Tiles with 5/8 walls around: ${wallCount5} (${(wallCount5/totalFloors*100).toFixed(1)}%)`);
-                console.log(`Dead-ends (detected): ${deadEnds} (${(deadEnds/totalFloors*100).toFixed(1)}%)`);
-                console.log(`Corners: ${corners} (${(corners/totalFloors*100).toFixed(1)}%)`);
-                console.log(`Alcoves: ${alcoves} (${(alcoves/totalFloors*100).toFixed(1)}%)`);
-                console.log(`Room centers: ${centers} (${(centers/totalFloors*100).toFixed(1)}%)`);
-                console.log(`Junctions: ${junctions} (${(junctions/totalFloors*100).toFixed(1)}%)`);
-                console.log(`Near walls: ${nearWalls} (${(nearWalls/totalFloors*100).toFixed(1)}%)`);
-                console.log(`Average weight: ${(totalWeight/totalFloors).toFixed(2)}`);
+                console.log(`\nWall count distribution:`);
+                for (let i = 0; i <= 8; i++) {
+                    if (wallCounts[i] > 0) {
+                        const pct = (wallCounts[i]/totalFloors*100).toFixed(1);
+                        const weightInfo = weightByWallCount[i] > 0 ? ` (weight: ${weightByWallCount[i].toFixed(1)})` : '';
+                        console.log(`  ${i} walls: ${wallCounts[i]} tiles (${pct}%)${weightInfo}`);
+                    }
+                }
+                
+                console.log(`\nLocation type distribution:`);
+                for (const [type, count] of Object.entries(locationTypes)) {
+                    if (count > 0) {
+                        const pct = (count/totalFloors*100).toFixed(1);
+                        console.log(`  ${type}: ${count} (${pct}%)`);
+                    }
+                }
+                
+                console.log(`\nAverage weight: ${(totalWeight/totalFloors).toFixed(2)}`);
             },
             
             // Force spawn items with terrain bias
@@ -2594,19 +2633,62 @@ class Game {
                 }
                 
                 console.log('=== Current Items ===');
+                const locationStats = {
+                    'DEAD-END': 0,
+                    'VERY-ENCLOSED': 0,
+                    'ENCLOSED': 0,
+                    'CORNER': 0,
+                    'ROOM-CENTER': 0,
+                    'ROOM': 0,
+                    'NEAR-WALLS': 0,
+                    'CORRIDOR': 0
+                };
+                
                 this.itemManager.items.forEach((item, i) => {
                     const weight = this.itemManager.calculateLocationSpecialness(item.x, item.y);
                     const wallsAround = this.itemManager.countNearbyWalls(item.x, item.y);
-                    const types = [];
+                    let locationType = 'CORRIDOR';
                     
-                    if (this.itemManager.isDeadEnd(item.x, item.y)) types.push('dead-end');
-                    if (this.itemManager.isCornerPosition(item.x, item.y)) types.push('corner');
-                    if (this.itemManager.isHiddenAlcove(item.x, item.y)) types.push('alcove');
-                    if (this.itemManager.isRoomCenter(item.x, item.y)) types.push('room-center');
-                    if (this.itemManager.isCorridorJunction(item.x, item.y)) types.push('junction');
+                    // Determine location type using same logic as item spawning
+                    if (wallsAround >= 7) {
+                        locationType = 'DEAD-END';
+                    } else if (wallsAround >= 6) {
+                        locationType = 'VERY-ENCLOSED';
+                    } else if (wallsAround >= 5) {
+                        locationType = 'ENCLOSED';
+                    } else if (this.itemManager.isInAnyRoom(item.x, item.y)) {
+                        if (this.itemManager.isRoomCenter(item.x, item.y)) {
+                            locationType = 'ROOM-CENTER';
+                        } else {
+                            // Check for corner
+                            const north = !this.dungeon.isInBounds(item.x, item.y-1) || this.dungeon.getTile(item.x, item.y-1).type === 'wall';
+                            const south = !this.dungeon.isInBounds(item.x, item.y+1) || this.dungeon.getTile(item.x, item.y+1).type === 'wall';
+                            const east = !this.dungeon.isInBounds(item.x+1, item.y) || this.dungeon.getTile(item.x+1, item.y).type === 'wall';
+                            const west = !this.dungeon.isInBounds(item.x-1, item.y) || this.dungeon.getTile(item.x-1, item.y).type === 'wall';
+                            
+                            if ((north && east) || (north && west) || (south && east) || (south && west)) {
+                                locationType = 'CORNER';
+                            } else {
+                                locationType = 'ROOM';
+                            }
+                        }
+                    } else if (wallsAround >= 3) {
+                        locationType = 'NEAR-WALLS';
+                    }
                     
-                    console.log(`${i+1}. ${item.name} at (${item.x}, ${item.y}) weight: ${weight.toFixed(1)}, walls: ${wallsAround}/8 [${types.length > 0 ? types.join(', ') : 'normal'}]`);
+                    locationStats[locationType]++;
+                    
+                    console.log(`${i+1}. ${item.name} at (${item.x}, ${item.y}) - ${locationType}, weight: ${weight.toFixed(1)}, walls: ${wallsAround}/8`);
                 });
+                
+                console.log(`\nTotal items: ${this.itemManager.items.length}`);
+                console.log('Distribution by location type:');
+                for (const [type, count] of Object.entries(locationStats)) {
+                    if (count > 0) {
+                        const pct = ((count / this.itemManager.items.length) * 100).toFixed(1);
+                        console.log(`  ${type}: ${count} (${pct}%)`);
+                    }
+                }
             }
         };
         

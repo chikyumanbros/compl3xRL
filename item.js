@@ -1874,33 +1874,58 @@ class ItemManager {
      * Generate random items throughout the dungeon
      */
     spawnItems(level) {
-        // Reduced item count: 3-6 items per level (was 8-19)
-        const numItems = 3 + Math.floor(Math.random() * 4); // 3-6 items per level
+        // Increased item count: 10-15 items per level
+        const numItems = 10 + Math.floor(Math.random() * 6); // 10-15 items per level
         let spawnedCount = 0;
+        let locationStats = {
+            'DEAD-END': 0,
+            'VERY-ENCLOSED': 0,
+            'ENCLOSED': 0,
+            'CORNER': 0,
+            'ROOM-CENTER': 0,
+            'ROOM': 0,
+            'NEAR-WALLS': 0,
+            'CORRIDOR': 0
+        };
+        
+        console.log(`\n=== Spawning ${numItems} items for level ${level} ===`);
         
         for (let i = 0; i < numItems; i++) {
-            const position = this.getRandomFloorPosition();
-            if (position) {
+            const positionData = this.getRandomFloorPosition();
+            if (positionData) {
                 const item = this.createRandomItem(level);
                 if (item && typeof item === 'object') {
                     // Ensure coordinates are set correctly
-                    item.x = position.x;
-                    item.y = position.y;
+                    item.x = positionData.x;
+                    item.y = positionData.y;
                     
                     // Validate item has required properties
                     if (typeof item.x === 'number' && typeof item.y === 'number' && item.symbol) {
                         this.addItem(item);
                         spawnedCount++;
+                        
+                        // Track location statistics
+                        if (locationStats[positionData.locationType] !== undefined) {
+                            locationStats[positionData.locationType]++;
+                        }
                     } else {
-        
+                        console.error(`Invalid item properties:`, item);
                     }
                 } else {
-    
+                    console.error(`Failed to create item for level ${level}`);
                 }
             }
         }
         
-
+        // Report spawn statistics
+        console.log(`\nSpawn Statistics (${spawnedCount}/${numItems} items):`);
+        for (const [type, count] of Object.entries(locationStats)) {
+            if (count > 0) {
+                const percentage = ((count / spawnedCount) * 100).toFixed(1);
+                console.log(`  ${type}: ${count} (${percentage}%)`);
+            }
+        }
+        console.log('');
     }
     
     /**
@@ -2012,13 +2037,43 @@ class ItemManager {
         // Weighted random selection
         const selectedPosition = this.weightedRandomSelect(validPositions);
         
-        // Log special spawns
+        // Log special spawns (always log for debugging)
         const selectedWeight = validPositions.find(p => p.x === selectedPosition.x && p.y === selectedPosition.y)?.weight || 1;
-        if (selectedWeight > 2.0) {
-            console.log(`Special spawn at (${selectedPosition.x}, ${selectedPosition.y}) with weight ${selectedWeight.toFixed(1)}`);
+        const wallCount = this.countNearbyWalls(selectedPosition.x, selectedPosition.y);
+        let locationType = 'CORRIDOR'; // Default
+        
+        // Determine location type based on wall count and other factors
+        if (wallCount >= 7) {
+            locationType = 'DEAD-END';
+        } else if (wallCount >= 6) {
+            locationType = 'VERY-ENCLOSED';
+        } else if (wallCount >= 5) {
+            locationType = 'ENCLOSED';
+        } else if (this.isInAnyRoom(selectedPosition.x, selectedPosition.y)) {
+            // Check for room corner
+            const north = !this.dungeon.isInBounds(selectedPosition.x, selectedPosition.y-1) || 
+                         this.dungeon.getTile(selectedPosition.x, selectedPosition.y-1).type === 'wall';
+            const south = !this.dungeon.isInBounds(selectedPosition.x, selectedPosition.y+1) || 
+                         this.dungeon.getTile(selectedPosition.x, selectedPosition.y+1).type === 'wall';
+            const east = !this.dungeon.isInBounds(selectedPosition.x+1, selectedPosition.y) || 
+                        this.dungeon.getTile(selectedPosition.x+1, selectedPosition.y).type === 'wall';
+            const west = !this.dungeon.isInBounds(selectedPosition.x-1, selectedPosition.y) || 
+                        this.dungeon.getTile(selectedPosition.x-1, selectedPosition.y).type === 'wall';
+            
+            if ((north && east) || (north && west) || (south && east) || (south && west)) {
+                locationType = 'CORNER';
+            } else if (this.isRoomCenter(selectedPosition.x, selectedPosition.y)) {
+                locationType = 'ROOM-CENTER';
+            } else {
+                locationType = 'ROOM';
+            }
+        } else if (wallCount >= 3) {
+            locationType = 'NEAR-WALLS';
         }
         
-        return selectedPosition;
+        console.log(`Item spawn at (${selectedPosition.x}, ${selectedPosition.y}): ${locationType}, weight=${selectedWeight.toFixed(1)}, walls=${wallCount}/8`);
+        
+        return { x: selectedPosition.x, y: selectedPosition.y, locationType, weight: selectedWeight };
     }
     
     /**
@@ -2028,54 +2083,62 @@ class ItemManager {
     calculateLocationSpecialness(x, y) {
         let specialness = 1.0; // Base weight
         let locationTypes = [];
+        let primaryType = null;
         
-        // Check for dead-end (袋小路) - highest priority
-        if (this.isDeadEnd(x, y)) {
-            specialness *= 5.0; // 5x more likely in dead-ends
-            locationTypes.push('dead-end');
+        const wallCount = this.countNearbyWalls(x, y);
+        
+        // Simplified dead-end detection: lots of walls around
+        if (wallCount >= 7) {
+            specialness = 50.0; // VERY high chance for true dead-ends
+            primaryType = 'DEAD-END';
+        }
+        // Very enclosed spaces
+        else if (wallCount >= 6) {
+            specialness = 20.0; // High chance for very enclosed areas
+            primaryType = 'VERY-ENCLOSED';
+        }
+        // Enclosed spaces
+        else if (wallCount >= 5) {
+            specialness = 10.0; // Good chance for enclosed areas
+            primaryType = 'ENCLOSED';
+        }
+        // Check for room corners
+        else if (this.isInAnyRoom(x, y) && wallCount >= 3) {
+            // Simple corner check: in a room with 3+ walls nearby
+            const north = !this.dungeon.isInBounds(x, y-1) || this.dungeon.getTile(x, y-1).type === 'wall';
+            const south = !this.dungeon.isInBounds(x, y+1) || this.dungeon.getTile(x, y+1).type === 'wall';
+            const east = !this.dungeon.isInBounds(x+1, y) || this.dungeon.getTile(x+1, y).type === 'wall';
+            const west = !this.dungeon.isInBounds(x-1, y) || this.dungeon.getTile(x-1, y).type === 'wall';
             
-            // Debug: Always log dead-end detection with 8-directional info
-            if (Math.random() < 0.3) { // 30% chance to log
-                const wallCount = this.countNearbyWalls(x, y);
-                console.log(`True dead-end detected at (${x}, ${y}): 8-dir walls = ${wallCount}/8`);
+            // Adjacent walls form a corner
+            if ((north && east) || (north && west) || (south && east) || (south && west)) {
+                specialness = 8.0;
+                primaryType = 'CORNER';
             }
         }
-        
-        // Check for corner position (部屋の角)
-        if (this.isCornerPosition(x, y)) {
-            specialness *= 4.0; // 4x more likely in corners
-            locationTypes.push('corner');
+        // Room centers
+        else if (this.isRoomCenter(x, y)) {
+            specialness = 5.0; // Moderate chance in room centers
+            primaryType = 'ROOM-CENTER';
+        }
+        // Near walls
+        else if (wallCount >= 3) {
+            specialness = 3.0; // Some chance near walls
+            primaryType = 'NEAR-WALLS';
+        }
+        // Check if in room vs corridor
+        else if (this.isInAnyRoom(x, y)) {
+            specialness = 2.0; // Slight preference for rooms
+            primaryType = 'ROOM';
+        }
+        else {
+            specialness = 1.0; // Base weight for corridors
+            primaryType = 'CORRIDOR';
         }
         
-        // Check for hidden alcove (隠れた場所)
-        if (this.isHiddenAlcove(x, y)) {
-            specialness *= 3.5; // 3.5x more likely in hidden spots
-            locationTypes.push('alcove');
-        }
-        
-        // Check for room center (部屋の中央)
-        if (this.isRoomCenter(x, y)) {
-            specialness *= 2.5; // 2.5x more likely in room centers
-            locationTypes.push('room-center');
-        }
-        
-        // Check for corridor junction (通路の分岐点)
-        if (this.isCorridorJunction(x, y)) {
-            specialness *= 2.0; // 2x more likely at junctions
-            locationTypes.push('junction');
-        }
-        
-        // Slightly favor positions near walls (壁の近く)
-        const nearWallCount = this.countNearbyWalls(x, y);
-        if (nearWallCount >= 3) {
-            specialness *= 1.5; // 1.5x more likely near walls
-            locationTypes.push('near-walls');
-        }
-        
-        // Debug: Log high-value locations
-        if (specialness > 3.0 && Math.random() < 0.2) { // Lowered threshold and increased chance
-            const wallCount = this.countNearbyWalls(x, y);
-            console.log(`Special location (${x}, ${y}): weight ${specialness.toFixed(1)}, 8-dir walls: ${wallCount}/8, types: ${locationTypes.join(', ')}`);
+        // Debug: Log all calculations for debugging
+        if (Math.random() < 0.1) { // 10% chance to log
+            console.log(`Location (${x}, ${y}): type=${primaryType}, weight=${specialness.toFixed(1)}, walls=${wallCount}/8`);
         }
         
         return specialness;
@@ -2083,98 +2146,147 @@ class ItemManager {
     
     /**
      * Check if position is a dead-end (袋小路)
-     * True dead-end: 7 out of 8 surrounding tiles are walls, only 1 is floor
+     * True dead-end: exactly 1 walkable adjacent tile (4-directional check)
      */
     isDeadEnd(x, y) {
-        const directions = [
-            [-1, -1], [0, -1], [1, -1],  // NW, N, NE
-            [-1,  0],          [1,  0],  // W,     E
-            [-1,  1], [0,  1], [1,  1]   // SW, S, SE
+        // First check 4-directional (cardinal) for true dead-end
+        const cardinalDirections = [
+            [0, -1], [1, 0], [0, 1], [-1, 0] // N, E, S, W
         ];
         
-        let floorCount = 0;
-        let wallCount = 0;
+        let cardinalWalkable = 0;
         
-        for (const [dx, dy] of directions) {
+        for (const [dx, dy] of cardinalDirections) {
             const checkX = x + dx;
             const checkY = y + dy;
             
-            if (!this.dungeon.isInBounds(checkX, checkY)) {
-                wallCount++; // Out of bounds counts as wall
-                continue;
-            }
-            
-            const tile = this.dungeon.getTile(checkX, checkY);
-            if (tile.type === 'floor') {
-                floorCount++;
-            } else if (tile.type === 'wall') {
-                wallCount++;
+            if (this.dungeon.isInBounds(checkX, checkY)) {
+                const tile = this.dungeon.getTile(checkX, checkY);
+                if (tile.type === 'floor' || (tile.type === 'door' && tile.doorState === 'open')) {
+                    cardinalWalkable++;
+                }
             }
         }
         
-        // True dead-end: exactly 1 floor tile and 7 walls around
-        return floorCount === 1 && wallCount === 7;
+        // True dead-end has exactly 1 cardinal exit
+        if (cardinalWalkable !== 1) {
+            return false;
+        }
+        
+        // Additional check: ensure diagonals are mostly blocked
+        const diagonalDirections = [
+            [-1, -1], [1, -1], [-1, 1], [1, 1] // NW, NE, SW, SE
+        ];
+        
+        let diagonalBlocked = 0;
+        
+        for (const [dx, dy] of diagonalDirections) {
+            const checkX = x + dx;
+            const checkY = y + dy;
+            
+            if (!this.dungeon.isInBounds(checkX, checkY) || 
+                this.dungeon.getTile(checkX, checkY).type === 'wall') {
+                diagonalBlocked++;
+            }
+        }
+        
+        // At least 3 diagonals should be blocked for a true dead-end
+        return diagonalBlocked >= 3;
     }
     
     /**
      * Check if position is in a corner (diagonally enclosed)
      */
     isCornerPosition(x, y) {
-        const directions = [
-            [-1, -1], [0, -1], [1, -1],
-            [-1,  0],          [1,  0],
-            [-1,  1], [0,  1], [1,  1]
-        ];
+        // First check if we're in a room
+        if (!this.isInAnyRoom(x, y)) {
+            return false;
+        }
         
-        let wallCount = 0;
-        let floorCount = 0;
+        // Check cardinal directions
+        const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N, E, S, W
+        let cardinalWalls = 0;
         
-        for (const [dx, dy] of directions) {
+        for (const [dx, dy] of cardinalDirs) {
             const checkX = x + dx;
             const checkY = y + dy;
             
-            if (!this.dungeon.isInBounds(checkX, checkY)) {
-                wallCount++;
-                continue;
-            }
-            
-            const tile = this.dungeon.getTile(checkX, checkY);
-            if (tile.type === 'wall') {
-                wallCount++;
-            } else if (tile.type === 'floor') {
-                floorCount++;
+            if (!this.dungeon.isInBounds(checkX, checkY) || 
+                this.dungeon.getTile(checkX, checkY).type === 'wall') {
+                cardinalWalls++;
             }
         }
         
-        // Corner if mostly surrounded by walls but has some floor access
-        return wallCount >= 5 && floorCount >= 2;
+        // Corner position has exactly 2 adjacent walls in cardinal directions
+        // forming an L-shape (e.g., N and E walls, or S and W walls)
+        if (cardinalWalls !== 2) {
+            return false;
+        }
+        
+        // Check if the two walls are adjacent (not opposite)
+        const north = !this.dungeon.isInBounds(x, y-1) || this.dungeon.getTile(x, y-1).type === 'wall';
+        const south = !this.dungeon.isInBounds(x, y+1) || this.dungeon.getTile(x, y+1).type === 'wall';
+        const east = !this.dungeon.isInBounds(x+1, y) || this.dungeon.getTile(x+1, y).type === 'wall';
+        const west = !this.dungeon.isInBounds(x-1, y) || this.dungeon.getTile(x-1, y).type === 'wall';
+        
+        // True corners have adjacent walls, not opposite walls
+        return (north && east) || (north && west) || (south && east) || (south && west);
     }
     
     /**
-     * Check if position is a hidden alcove (3 sides walled)
+     * Check if position is a hidden alcove (small recessed area)
      */
     isHiddenAlcove(x, y) {
+        // Alcoves are typically small side areas off corridors or rooms
+        // Not in the main path, with limited access
+        
         const cardinalDirections = [
             [0, -1], [1, 0], [0, 1], [-1, 0] // N, E, S, W
         ];
         
         let wallCount = 0;
-        for (const [dx, dy] of cardinalDirections) {
+        let openDirections = [];
+        
+        for (let i = 0; i < cardinalDirections.length; i++) {
+            const [dx, dy] = cardinalDirections[i];
             const checkX = x + dx;
             const checkY = y + dy;
             
-            if (!this.dungeon.isInBounds(checkX, checkY)) {
+            if (!this.dungeon.isInBounds(checkX, checkY) || 
+                this.dungeon.getTile(checkX, checkY).type === 'wall') {
                 wallCount++;
-                continue;
-            }
-            
-            const tile = this.dungeon.getTile(checkX, checkY);
-            if (tile.type === 'wall') {
-                wallCount++;
+            } else if (this.dungeon.getTile(checkX, checkY).type === 'floor') {
+                openDirections.push([dx, dy]);
             }
         }
         
-        return wallCount >= 3; // 3 or 4 sides walled
+        // Alcove has exactly 3 walls (one opening)
+        if (wallCount !== 3 || openDirections.length !== 1) {
+            return false;
+        }
+        
+        // Check if the open direction leads to a larger space (not another narrow passage)
+        const [openDx, openDy] = openDirections[0];
+        const beyondX = x + openDx * 2;
+        const beyondY = y + openDy * 2;
+        
+        if (this.dungeon.isInBounds(beyondX, beyondY)) {
+            // Count open spaces around the entrance
+            let entranceOpenCount = 0;
+            for (const [dx, dy] of cardinalDirections) {
+                const checkX = x + openDx + dx;
+                const checkY = y + openDy + dy;
+                if (this.dungeon.isInBounds(checkX, checkY) && 
+                    this.dungeon.getTile(checkX, checkY).type === 'floor') {
+                    entranceOpenCount++;
+                }
+            }
+            
+            // True alcove if entrance leads to wider area (3+ open tiles)
+            return entranceOpenCount >= 3;
+        }
+        
+        return true;
     }
     
     /**
@@ -2195,11 +2307,41 @@ class ItemManager {
     }
     
     /**
-     * Check if position is at a corridor junction (3+ adjacent floors)
+     * Check if position is at a corridor junction (3+ adjacent floors with different directions)
      */
     isCorridorJunction(x, y) {
-        const adjacentFloors = this.countAdjacentFloors(x, y);
-        return adjacentFloors >= 3 && !this.isInAnyRoom(x, y);
+        // Must not be in a room
+        if (this.isInAnyRoom(x, y)) return false;
+        
+        const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N, E, S, W
+        let floorDirections = [];
+        
+        for (let i = 0; i < directions.length; i++) {
+            const [dx, dy] = directions[i];
+            const checkX = x + dx;
+            const checkY = y + dy;
+            
+            if (this.dungeon.isInBounds(checkX, checkY)) {
+                const tile = this.dungeon.getTile(checkX, checkY);
+                if (tile.type === 'floor' || tile.type === 'door') {
+                    floorDirections.push(i);
+                }
+            }
+        }
+        
+        // True junction: 3+ exits, or T-junction (3 exits)
+        if (floorDirections.length >= 3) {
+            // Additional check: not just a wide corridor
+            // If we have opposite directions (N-S or E-W), check if it's a real junction
+            const hasNS = floorDirections.includes(0) && floorDirections.includes(2);
+            const hasEW = floorDirections.includes(1) && floorDirections.includes(3);
+            
+            // Real junction if we have perpendicular paths
+            return (hasNS && (floorDirections.includes(1) || floorDirections.includes(3))) ||
+                   (hasEW && (floorDirections.includes(0) || floorDirections.includes(2)));
+        }
+        
+        return false;
     }
     
     /**

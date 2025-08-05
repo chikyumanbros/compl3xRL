@@ -479,7 +479,7 @@ class Player {
             if (blockRoll <= blockChance) {
                 // Successful block!
                 blockedAttack = true;
-                if (window.game && window.game.renderer) {
+        if (window.game && window.game.renderer) {
                     window.game.renderer.addBattleLogMessage(
                         `You block the attack with your shield! (${blockRoll} ≤ ${blockChance}% BC)`, 
                         'victory'
@@ -1444,19 +1444,19 @@ class Player {
             let statsText = equipmentStatsText;
             if (!equipmentStatsText) {
                 if (item.type === 'potion') {
-                    const healStats = [];
-                    if (item.healDice) {
-                        healStats.push(`Heal: ${item.healDice} HP`);
-                    } else if (item.healAmount > 0) {
-                        healStats.push(`Heal: ${item.healAmount} HP`);
-                    }
-                    if (healStats.length > 0) statsText = ` [${healStats.join(', ')}]`;
-                } else if (item.type === 'food') {
-                    const foodStats = [];
-                    if (item.nutrition) foodStats.push(`Nutrition: ${item.nutrition}`);
-                    if (item.healAmount > 0) foodStats.push(`Heal: ${item.healAmount} HP`);
-                    if (item.perishable) foodStats.push('Perishable');
-                    if (foodStats.length > 0) statsText = ` [${foodStats.join(', ')}]`;
+                const healStats = [];
+                if (item.healDice) {
+                    healStats.push(`Heal: ${item.healDice} HP`);
+                } else if (item.healAmount > 0) {
+                    healStats.push(`Heal: ${item.healAmount} HP`);
+                }
+                if (healStats.length > 0) statsText = ` [${healStats.join(', ')}]`;
+            } else if (item.type === 'food') {
+                const foodStats = [];
+                if (item.nutrition) foodStats.push(`Nutrition: ${item.nutrition}`);
+                if (item.healAmount > 0) foodStats.push(`Heal: ${item.healAmount} HP`);
+                if (item.perishable) foodStats.push('Perishable');
+                if (foodStats.length > 0) statsText = ` [${foodStats.join(', ')}]`;
                 }
             }
             
