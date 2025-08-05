@@ -219,9 +219,9 @@ class Player {
         // Check if the position is walkable
         if (dungeon.isWalkable(newX, newY)) {
             this.moveTo(newX, newY);
-            // Generate movement sound
+            // Generate movement sound (adjusted for encumbrance)
             if (window.game && window.game.noiseSystem) {
-                window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getPlayerActionSound('MOVE'));
+                window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getPlayerActionSound('MOVE', this));
             }
             return true;
         }
@@ -241,9 +241,9 @@ class Player {
             if (window.game && window.game.renderer) {
                 window.game.renderer.addLogMessage('You walk through the open door.');
             }
-        // Generate movement sound
+        // Generate movement sound (adjusted for encumbrance)
         if (window.game && window.game.noiseSystem) {
-            window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getPlayerActionSound('MOVE'));
+            window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getPlayerActionSound('MOVE', this));
         }
             return true;
         } else if (doorState === 'closed') {

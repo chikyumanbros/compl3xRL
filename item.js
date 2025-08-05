@@ -1874,8 +1874,8 @@ class ItemManager {
      * Generate random items throughout the dungeon
      */
     spawnItems(level) {
-        // Increased item count: 10-15 items per level
-        const numItems = 10 + Math.floor(Math.random() * 6); // 10-15 items per level
+        // Balanced item count: 3-6 items per level
+        const numItems = 3 + Math.floor(Math.random() * 4); // 3-6 items per level
         let spawnedCount = 0;
         let locationStats = {
             'DEAD-END': 0,

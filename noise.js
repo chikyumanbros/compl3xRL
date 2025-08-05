@@ -177,10 +177,42 @@ class NoiseSystem {
     }
     
     /**
-     * Get sound level for player action
+     * Get sound level for player action (with weight modification for movement)
      */
-    getPlayerActionSound(action) {
-        return this.soundLevels[action] || this.soundLevels.SILENCE;
+    getPlayerActionSound(action, player = null) {
+        let baseSound = this.soundLevels[action] || this.soundLevels.SILENCE;
+        
+        // Modify movement sound based on player's encumbrance
+        if (action === 'MOVE' && player && typeof player.getEncumbranceLevel === 'function') {
+            const encumbrance = player.getEncumbranceLevel();
+            baseSound = this.calculateMovementNoiseLevel(baseSound, encumbrance);
+        }
+        
+        return baseSound;
+    }
+    
+    /**
+     * Calculate movement noise level based on encumbrance
+     */
+    calculateMovementNoiseLevel(baseLevel, encumbrance) {
+        const weightNoiseModifiers = {
+            'UNENCUMBERED': 0,    // No change (quiet movement)
+            'BURDENED': 1,        // +1 level (heavier footsteps)
+            'STRESSED': 2,        // +2 levels (noticeable noise)
+            'STRAINED': 2,        // +2 levels (labored movement)
+            'OVERTAXED': 3,       // +3 levels (loud, difficult movement)
+            'OVERLOADED': 3       // +3 levels (very loud, struggling)
+        };
+        
+        const modifier = weightNoiseModifiers[encumbrance.level] || 0;
+        const adjustedLevel = Math.min(baseLevel + modifier, 5); // Cap at max sound level
+        
+        // Debug log for weight-based noise (only occasionally)
+        if (modifier > 0 && Math.random() < 0.05) { // 5% chance to log
+            console.log(`Movement noise: ${encumbrance.name} (${encumbrance.level}) - base: ${baseLevel}, modifier: +${modifier}, final: ${adjustedLevel}`);
+        }
+        
+        return adjustedLevel;
     }
     
     /**
