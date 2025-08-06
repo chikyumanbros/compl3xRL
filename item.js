@@ -123,6 +123,9 @@ class EquipmentItem extends Item {
         // Block Chance system (Shield-specific)
         this.blockChance = data.blockChance || 0; // % chance to block damage after hit
         
+        // Status effect resistances (Armor-specific)
+        this.resistances = data.resistances || {}; // e.g., { bleeding: 20, stunned: 15 }
+        
         // Enhancement level
         this.enchantment = data.enchantment || 0; // +1, +2, etc.
         
@@ -1275,9 +1278,13 @@ const EQUIPMENT_TYPES = {
             weight: 12,
             value: 100,
             material: 'leather',
+            resistances: {
+                stunned: 10,     // Flexible material absorbs some impact
+                fractured: 5     // Minor bone protection
+            },
             symbol: '(',
             color: '#8B4513',
-            description: 'Basic leather armor. Light and flexible. (AC -2, Protection 1)'
+            description: 'Basic leather armor. Light and flexible. (AC -2, DR 1, Stun Resist 10%)'
         },
         studded: {
             name: 'Studded Leather',
@@ -1288,9 +1295,14 @@ const EQUIPMENT_TYPES = {
             weight: 20,
             value: 150,
             material: 'leather',
+            resistances: {
+                bleeding: 10,    // Metal studs provide some puncture protection
+                stunned: 15,     // Better impact absorption
+                fractured: 10    // Improved bone protection
+            },
             symbol: '(',
             color: '#654321',
-            description: 'Leather armor reinforced with metal studs. (AC -3, Protection 2)'
+            description: 'Studded leather. (AC -3, DR 2, Bleed/Stun Resist)'
         },
         chainmail: {
             name: 'Chain Mail',
@@ -1301,9 +1313,14 @@ const EQUIPMENT_TYPES = {
             weight: 30,
             value: 500,
             material: 'steel',
+            resistances: {
+                bleeding: 20,    // Good protection against cuts
+                stunned: 10,     // Some impact absorption
+                fractured: 15    // Moderate bone protection
+            },
             symbol: '[',
             color: '#C0C0C0',
-            description: 'Interlocking metal rings. Excellent protection. (AC -5, Protection 3)'
+            description: 'Chain mail. (AC -5, DR 3, Good Bleed Resist)'
         },
         platemail: {
             name: 'Plate Mail',
@@ -1314,9 +1331,14 @@ const EQUIPMENT_TYPES = {
             weight: 45,
             value: 1000,
             material: 'steel',
+            resistances: {
+                bleeding: 30,    // Excellent cut protection
+                stunned: 5,      // Rigid armor doesn't absorb impact well
+                fractured: 25    // Excellent bone protection
+            },
             symbol: ']',
             color: '#DCDCDC',
-            description: 'Full plate armor. Maximum protection for warriors. (AC -7, Protection 4)'
+            description: 'Plate mail. (AC -7, DR 4, Excellent Physical Resist)'
         }
     },
     
@@ -1332,9 +1354,13 @@ const EQUIPMENT_TYPES = {
             weight: 6,
             value: 50,
             material: 'wood',
+            resistances: {
+                stunned: 5,      // Small shield offers minimal stun protection
+                bleeding: 5      // Basic cut deflection
+            },
             symbol: ')',
             color: '#8B4513',
-            description: 'A small round shield. Easy to maneuver. (BC 15%)'
+            description: 'Small buckler. (BC 15%, Minor Resists)'
         },
         smallShield: {
             name: 'Small Shield',
@@ -1346,9 +1372,14 @@ const EQUIPMENT_TYPES = {
             weight: 8,
             value: 80,
             material: 'wood',
+            resistances: {
+                stunned: 10,     // Better impact absorption
+                bleeding: 10,    // Moderate cut deflection
+                fractured: 5     // Some bone protection
+            },
             symbol: ')',
             color: '#8B4513',
-            description: 'A standard wooden shield with metal rim. (BC 20%)'
+            description: 'Small shield. (BC 20%, Moderate Resists)'
         },
         largeShield: {
             name: 'Large Shield',
@@ -1360,9 +1391,14 @@ const EQUIPMENT_TYPES = {
             weight: 12,
             value: 200,
             material: 'steel',
+            resistances: {
+                stunned: 15,     // Excellent impact absorption
+                bleeding: 15,    // Good cut deflection
+                fractured: 10    // Moderate bone protection
+            },
             symbol: ')',
             color: '#C0C0C0',
-            description: 'A heavy shield offering excellent protection. (BC 25%)'
+            description: 'Large shield. (BC 25%, Good Resists)'
         }
     },
     
@@ -1452,9 +1488,12 @@ const EQUIPMENT_TYPES = {
             weight: 2,
             value: 25,
             material: 'leather',
+            resistances: {
+                stunned: 15      // Basic concussion protection
+            },
             symbol: ']',
             color: '#8B4513',
-            description: 'A simple leather cap. Basic head protection. (AC -1)'
+            description: 'Leather cap. (AC -1, Stun Resist 15%)'
         },
         ironHelm: {
             name: 'Iron Helm',
@@ -1465,9 +1504,13 @@ const EQUIPMENT_TYPES = {
             weight: 3,
             value: 100,
             material: 'iron',
+            resistances: {
+                stunned: 25,     // Good concussion protection
+                fractured: 10    // Some skull protection
+            },
             symbol: ']',
             color: '#A0A0A0',
-            description: 'A sturdy iron helmet. Good protection for warriors. (AC -2, DR 1)'
+            description: 'Iron helm. (AC -2, DR 1, Stun Resist 25%)'
         },
         steelHelm: {
             name: 'Steel Helm',
@@ -1478,9 +1521,14 @@ const EQUIPMENT_TYPES = {
             weight: 4.5,
             value: 250,
             material: 'steel',
+            resistances: {
+                stunned: 35,     // Excellent concussion protection
+                fractured: 15,   // Good skull protection
+                bleeding: 10     // Head wound protection
+            },
             symbol: ']',
             color: '#E0E0E0',
-            description: 'A well-crafted steel helmet. Excellent head protection. (AC -3, DR 2)'
+            description: 'Steel helm. (AC -3, DR 2, Excellent Stun Resist)'
         }
     },
     
@@ -1496,9 +1544,12 @@ const EQUIPMENT_TYPES = {
             weight: 0.8,
             value: 20,
             material: 'leather',
+            resistances: {
+                bleeding: 10     // Hand wound protection
+            },
             symbol: '[',
             color: '#8B4513',
-            description: 'Flexible leather gloves. Improves grip. (To Hit +1)'
+            description: 'Leather gloves. (To Hit +1, Bleed Resist 10%)'
         },
         chainGloves: {
             name: 'Chain Gloves',
@@ -1510,9 +1561,13 @@ const EQUIPMENT_TYPES = {
             weight: 1.5,
             value: 75,
             material: 'steel',
+            resistances: {
+                bleeding: 15,    // Good hand wound protection
+                fractured: 5     // Some finger bone protection
+            },
             symbol: '[',
             color: '#C0C0C0',
-            description: 'Flexible chainmail gloves. Hand protection. (AC -1, DR 1)'
+            description: 'Chain gloves. (AC -1, DR 1, Bleed Resist 15%)'
         },
         plateGloves: {
             name: 'Plate Gloves',
@@ -1524,9 +1579,13 @@ const EQUIPMENT_TYPES = {
             weight: 2.5,
             value: 150,
             material: 'steel',
+            resistances: {
+                bleeding: 20,    // Excellent hand wound protection
+                fractured: 10    // Good finger bone protection
+            },
             symbol: '[',
             color: '#DCDCDC',
-            description: 'Heavy plate gauntlets. Maximum hand protection. (AC -1, DR 2, To Hit -1)'
+            description: 'Plate gauntlets. (AC -1, DR 2, To Hit -1, Good Resists)'
         }
     },
     
@@ -1541,9 +1600,13 @@ const EQUIPMENT_TYPES = {
             weight: 2.5,
             value: 30,
             material: 'leather',
+            resistances: {
+                fractured: 10,   // Ankle support
+                confused: 5      // Better footing
+            },
             symbol: ']',
             color: '#8B4513',
-            description: 'Sturdy leather boots. Basic foot protection. (AC -1)'
+            description: 'Leather boots. (AC -1, Fracture Resist 10%)'
         },
         ironBoots: {
             name: 'Iron Boots',
@@ -1554,9 +1617,14 @@ const EQUIPMENT_TYPES = {
             weight: 3.5,
             value: 100,
             material: 'iron',
+            resistances: {
+                fractured: 15,   // Good ankle/foot protection
+                confused: 10,    // Stable footing
+                bleeding: 5      // Some puncture protection
+            },
             symbol: ']',
             color: '#A0A0A0',
-            description: 'Heavy iron boots. Good foot protection. (AC -1, DR 1)'
+            description: 'Iron boots. (AC -1, DR 1, Good Fracture Resist)'
         },
         steelBoots: {
             name: 'Steel Boots',
@@ -1567,9 +1635,14 @@ const EQUIPMENT_TYPES = {
             weight: 4.5,
             value: 200,
             material: 'steel',
+            resistances: {
+                fractured: 20,   // Excellent ankle/foot protection
+                confused: 15,    // Very stable footing
+                bleeding: 10     // Good puncture protection
+            },
             symbol: ']',
             color: '#E0E0E0',
-            description: 'Plated steel boots. Excellent foot protection. (AC -2, DR 2)'
+            description: 'Steel boots. (AC -2, DR 2, Excellent Resists)'
         }
     },
     
@@ -1584,9 +1657,14 @@ const EQUIPMENT_TYPES = {
             weight: 0.1,
             value: 300,
             material: 'gold',
+            resistances: {
+                bleeding: 5,
+                stunned: 5,
+                fractured: 5
+            },
             symbol: '=',
             color: '#FFD700',
-            description: 'A magical ring that protects the wearer. (AC -1, DR 1)'
+            description: 'Ring of protection. (AC -1, DR 1, Minor Resists)'
         },
         ringOfAccuracy: {
             name: 'Ring of Accuracy',
@@ -1610,9 +1688,45 @@ const EQUIPMENT_TYPES = {
             weight: 0.1,
             value: 500,
             material: 'platinum',
+            resistances: {
+                stunned: 10,
+                confused: 10
+            },
             symbol: '=',
             color: '#E5E4E2',
-            description: 'A powerful magical ring. (To Hit +1, AC -1, AP 1)'
+            description: 'Ring of power. (To Hit +1, AC -1, AP 1, Mental Resists)'
+        },
+        ringOfResilience: {
+            name: 'Ring of Resilience',
+            type: 'ring',
+            category: EQUIPMENT_CATEGORIES.PROTECTION,
+            weight: 0.1,
+            value: 400,
+            material: 'mithril',
+            resistances: {
+                bleeding: 20,
+                poisoned: 20,
+                fractured: 15
+            },
+            symbol: '=',
+            color: '#B0E0E6',
+            description: 'Ring of resilience. (Excellent Physical Resists)'
+        },
+        ringOfClarity: {
+            name: 'Ring of Clarity',
+            type: 'ring',
+            category: EQUIPMENT_CATEGORIES.PROTECTION,
+            weight: 0.1,
+            value: 350,
+            material: 'crystal',
+            resistances: {
+                confused: 25,
+                stunned: 20,
+                paralyzed: 15
+            },
+            symbol: '=',
+            color: '#F0F8FF',
+            description: 'Ring of clarity. (Excellent Mental Resists)'
         }
     },
     
@@ -1627,9 +1741,14 @@ const EQUIPMENT_TYPES = {
             weight: 0.5,
             value: 400,
             material: 'silver',
+            resistances: {
+                bleeding: 10,
+                stunned: 10,
+                fractured: 10
+            },
             symbol: '"',
             color: '#C0C0C0',
-            description: 'A protective amulet that wards off harm. (AC -2, DR 1)'
+            description: 'Amulet of warding. (AC -2, DR 1, Balanced Resists)'
         },
         amuletOfMight: {
             name: 'Amulet of Might',
@@ -1654,9 +1773,46 @@ const EQUIPMENT_TYPES = {
             weight: 0.5,
             value: 600,
             material: 'gold',
+            resistances: {
+                confused: 15,
+                paralyzed: 10
+            },
             symbol: '"',
             color: '#FFD700',
-            description: 'A balanced amulet providing multiple benefits. (To Hit +1, AC -1, DR 1)'
+            description: 'Amulet of balance. (To Hit +1, AC -1, DR 1, Mental Resists)'
+        },
+        amuletOfVitality: {
+            name: 'Amulet of Vitality',
+            type: 'amulet',
+            category: EQUIPMENT_CATEGORIES.PROTECTION,
+            weight: 0.5,
+            value: 500,
+            material: 'ruby',
+            resistances: {
+                bleeding: 25,
+                poisoned: 30,
+                fractured: 20
+            },
+            symbol: '"',
+            color: '#DC143C',
+            description: 'Amulet of vitality. (Excellent Health Resists)'
+        },
+        amuletOfFortitude: {
+            name: 'Amulet of Fortitude',
+            type: 'amulet',
+            category: EQUIPMENT_CATEGORIES.PROTECTION,
+            protection: 2,
+            weight: 0.5,
+            value: 550,
+            material: 'obsidian',
+            resistances: {
+                stunned: 30,
+                fractured: 25,
+                paralyzed: 20
+            },
+            symbol: '"',
+            color: '#1C1C1C',
+            description: 'Amulet of fortitude. (DR 2, Excellent Physical Resists)'
         }
     }
 };

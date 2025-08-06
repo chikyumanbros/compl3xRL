@@ -122,6 +122,9 @@ class Player {
         
         // Add some test items to inventory
         this.addTestItems();
+        
+        // Initialize status effect manager
+        this.statusEffects = new StatusEffectManager(this);
     }
     
     /**
@@ -199,6 +202,43 @@ class Player {
         // Check for movement restrictions due to weight
         if (!this.canMove()) {
             return false;
+        }
+        
+        // Check for status effect movement restrictions
+        if (this.statusEffects) {
+            // Check if paralyzed
+            if (this.statusEffects.hasEffect('paralyzed')) {
+                if (window.game && window.game.renderer) {
+                    window.game.renderer.addLogMessage("You are paralyzed and cannot move!");
+                }
+                return false;
+            }
+            
+            // Check if confused - randomize movement
+            if (this.statusEffects.shouldRandomizeMovement()) {
+                // Random direction instead of intended
+                const directions = [
+                    [-1, -1], [0, -1], [1, -1],
+                    [-1, 0],           [1, 0],
+                    [-1, 1],  [0, 1],  [1, 1]
+                ];
+                const randomDir = directions[Math.floor(Math.random() * directions.length)];
+                dx = randomDir[0];
+                dy = randomDir[1];
+                
+                if (window.game && window.game.renderer) {
+                    window.game.renderer.addLogMessage("You stumble around in confusion!");
+                }
+            }
+            
+            // Apply movement speed penalty
+            const movementMod = this.statusEffects.getMovementModifier();
+            if (movementMod < 1.0 && Math.random() > movementMod) {
+                if (window.game && window.game.renderer) {
+                    window.game.renderer.addLogMessage("Your injuries slow you down!");
+                }
+                return true; // Turn consumed but no movement
+            }
         }
         
         const newX = this.x + dx;
@@ -562,9 +602,13 @@ class Player {
         
         if (window.game && window.game.renderer) {
             const breakdown = this.getStats().toHitBreakdown;
+            const toHitText = this.toHit >= 0 ? `+${this.toHit}` : `${this.toHit}`;
+            const baseText = this.baseToHit >= 0 ? `+${this.baseToHit}` : `${this.baseToHit}`;
+            const modValue = this.toHit - this.baseToHit;
+            const modText = modValue >= 0 ? `+${modValue}` : `${modValue}`;
             const modifierText = this.toHit !== this.baseToHit ? 
-                ` (base+${this.baseToHit}, mods${this.toHit - this.baseToHit})` : '';
-            window.game.renderer.addBattleLogMessage(`You attack ${monster.name}... (${naturalRoll} vs ${requiredRoll}+ needed, AC ${monster.armorClass}, hit+${this.toHit}${modifierText})`);
+                ` (base${baseText}, mods${modText})` : '';
+            window.game.renderer.addBattleLogMessage(`You attack ${monster.name}... (${naturalRoll} vs ${requiredRoll}+ needed, AC ${monster.armorClass}, hit${toHitText}${modifierText})`);
         }
         
         if (naturalRoll >= requiredRoll) {
@@ -585,7 +629,7 @@ class Player {
                 }
             }
             
-            monster.takeDamage(finalDamage, this.penetration);
+            const damageDealt = monster.takeDamage(finalDamage, this.penetration);
             
             // Check weapon durability after successful attack
             if (this.equipment.weapon) {
@@ -602,11 +646,41 @@ class Player {
                 }
             }
             
-            if (!monster.isAlive) {
-                if (window.game && window.game.renderer) {
-                    window.game.renderer.addBattleLogMessage(`You defeat the ${monster.name}!`, 'victory');
+            // Check for status effects from weapon (only if monster is still alive)
+            if (this.equipment.weapon && damageDealt > 0 && monster.hp > 0) {
+                // Check if status effect function is available
+                if (typeof calculateStatusEffectChance === 'function' && monster.statusEffects) {
+                    const weaponType = this.equipment.weapon.weaponType || 'default';
+                    const maxDamage = monster.maxHp;
+                    
+                    // Check each possible status effect
+                    const possibleEffects = ['bleeding', 'stunned', 'fractured'];
+                    for (const effectType of possibleEffects) {
+                        try {
+                            const effect = calculateStatusEffectChance(weaponType, effectType, damageDealt, maxDamage);
+                            if (effect && monster.statusEffects) {
+                                monster.statusEffects.addEffect(effect.type, effect.duration, effect.severity, 'player weapon');
+                            }
+                        } catch (error) {
+                            console.error(`Error applying status effect ${effectType}:`, error);
+                        }
+                    }
                 }
+            }
+            
+            if (!monster.isAlive) {
+                try {
+                if (window.game && window.game.renderer) {
+                        const monsterName = monster.name || 'the monster';
+                        window.game.renderer.addBattleLogMessage(`You defeat ${monsterName}!`, 'victory');
+                }
+                    if (monster.expValue) {
                 this.gainExp(monster.expValue);
+                    }
+                } catch (error) {
+                    console.error('Error in monster defeat handling:', error);
+                    console.error('Monster object:', monster);
+                }
             }
             
             // Generate combat sound
@@ -2550,5 +2624,38 @@ class Player {
         }
         
         return modifier;
+    }
+    
+    /**
+     * Get total status effect resistance from all equipped armor
+     * @param {string} effectType - The type of status effect (e.g., 'bleeding', 'stunned')
+     * @returns {number} Total resistance percentage (0-100)
+     */
+    getStatusResistance(effectType) {
+        let totalResistance = 0;
+        
+        // Check each equipment slot for resistances
+        const armorSlots = ['armor', 'helmet', 'gloves', 'boots', 'shield'];
+        
+        for (const slot of armorSlots) {
+            if (this.equipment[slot] && this.equipment[slot].resistances) {
+                const resistance = this.equipment[slot].resistances[effectType] || 0;
+                totalResistance += resistance;
+            }
+        }
+        
+        // Check rings and amulet for magical resistances
+        if (this.equipment.ring1 && this.equipment.ring1.resistances) {
+            totalResistance += this.equipment.ring1.resistances[effectType] || 0;
+        }
+        if (this.equipment.ring2 && this.equipment.ring2.resistances) {
+            totalResistance += this.equipment.ring2.resistances[effectType] || 0;
+        }
+        if (this.equipment.amulet && this.equipment.amulet.resistances) {
+            totalResistance += this.equipment.amulet.resistances[effectType] || 0;
+        }
+        
+        // Cap at 95% to avoid complete immunity
+        return Math.min(totalResistance, 95);
     }
 } 

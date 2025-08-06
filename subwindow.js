@@ -519,6 +519,24 @@ class SubWindow {
             properties.push(`Enchantment: ${item.enchantment > 0 ? '+' : ''}${item.enchantment}`);
         }
         
+        // Status effect resistances
+        if (item.resistances && Object.keys(item.resistances).length > 0) {
+            const resistanceList = [];
+            for (const [effect, value] of Object.entries(item.resistances)) {
+                const effectNames = {
+                    'bleeding': 'Bleeding',
+                    'stunned': 'Stun',
+                    'fractured': 'Fracture',
+                    'poisoned': 'Poison',
+                    'confused': 'Confusion',
+                    'paralyzed': 'Paralysis'
+                };
+                const effectName = effectNames[effect] || effect;
+                resistanceList.push(`${effectName} ${value}%`);
+            }
+            properties.push(`Resistances: ${resistanceList.join(', ')}`);
+        }
+        
         propsDiv.innerHTML = properties.join('<br>');
         this.content.appendChild(propsDiv);
         

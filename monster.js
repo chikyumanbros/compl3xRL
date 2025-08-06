@@ -789,6 +789,14 @@ class Monster {
         
         // Set fleeing personality based on monster type
         this.setFleePersonalityByType(type, stats);
+        
+        // Initialize status effect manager
+        this.statusEffects = new StatusEffectManager(this);
+        
+        // Add base stats for saving throws
+        this.constitution = 10 + Math.floor(stats.minDepth / 3); // Tougher monsters have better constitution
+        this.wisdom = 10 + Math.floor(stats.minDepth / 5); // Smarter monsters have better wisdom
+        this.strength = 10 + Math.floor(stats.minDepth / 4); // Stronger monsters have better strength
     }
     
     /**
@@ -1362,12 +1370,47 @@ class Monster {
                 }
             }
             
+            // Apply damage first
+            const playerDied = player.takeDamage(finalDamage, this.penetration || 0);
+            
+            // Check for status effects from monster attacks (only if player survived)
+            if (finalDamage > 0 && player.statusEffects && player.hp > 0) {
+                // Check if status effect function is available
+                if (typeof calculateStatusEffectChance === 'function') {
+                    // Monster natural weapons have different effect chances based on type
+                    const monsterWeaponType = this.getMonsterWeaponType();
+                    const maxDamage = player.maxHp;
+                    
+                    // Check each possible status effect
+                    const possibleEffects = ['bleeding', 'stunned', 'fractured', 'poisoned'];
+                    for (const effectType of possibleEffects) {
+                        try {
+                            // Some monsters have special status effect chances
+                            if (effectType === 'poisoned' && this.type && ['snake', 'spider', 'centipede'].includes(this.type)) {
+                                // Venomous creatures have high poison chance
+                                if (Math.random() < 0.3) {
+                                    player.statusEffects.addEffect('poisoned', 5 + Math.floor(Math.random() * 5), 
+                                        Math.min(3, 1 + Math.floor(finalDamage / 5)), this.name);
+                                }
+                            } else {
+                                const effect = calculateStatusEffectChance(monsterWeaponType, effectType, finalDamage, maxDamage);
+                                if (effect) {
+                                    player.statusEffects.addEffect(effect.type, effect.duration, effect.severity, this.name);
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`Error applying status effect ${effectType} from ${this.name}:`, error);
+                        }
+                    }
+                }
+            }
+            
             // Generate monster combat sound
             if (window.game && window.game.noiseSystem) {
                 window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getMonsterActionSound('MONSTER_ATTACK'));
             }
             
-            return player.takeDamage(finalDamage, this.penetration || 0);
+            return playerDied;
         } else {
             // Miss
             if (window.game && window.game.renderer) {
@@ -1381,6 +1424,30 @@ class Monster {
             
             return false; // Player not hit
         }
+    }
+    
+    /**
+     * Get monster weapon type for status effect calculations
+     */
+    getMonsterWeaponType() {
+        // Map monster types to weapon categories
+        const clawTypes = ['rat', 'bat', 'wolf', 'bear', 'gecko', 'wyvern', 'dragon', 'griffin'];
+        const biteTypes = ['snake', 'spider', 'centipede', 'purple_worm', 'jackal'];
+        const bashTypes = ['ogre', 'troll', 'giant', 'ettin', 'frost_giant', 'umber_hulk'];
+        const slashTypes = ['orc', 'hobgoblin', 'gnoll', 'minotaur', 'balrog'];
+        
+        if (clawTypes.includes(this.type)) {
+            return 'dagger'; // Claws act like piercing/slashing
+        } else if (biteTypes.includes(this.type)) {
+            return 'dagger'; // Bites are piercing
+        } else if (bashTypes.includes(this.type)) {
+            return 'hammer'; // Bashing attacks
+        } else if (slashTypes.includes(this.type)) {
+            return 'sword'; // Slashing attacks
+        }
+        
+        // Default to basic attack type
+        return 'default';
     }
     
     /**

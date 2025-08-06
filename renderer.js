@@ -295,8 +295,33 @@ class Renderer {
             return;
         }
         
-        // Update player stats
-        document.getElementById('player-hp').textContent = `HP: ${player.hp}/${player.maxHp}`;
+        // Update player stats (with status effect indication)
+        const hpElement = document.getElementById('player-hp');
+        hpElement.textContent = `HP: ${player.hp}/${player.maxHp}`;
+        
+        // Change HP color if affected by status effects
+        if (player.statusEffects) {
+            const activeEffects = player.statusEffects.getActiveEffects();
+            if (activeEffects.length > 0) {
+                // Check for dangerous effects
+                const hasBleeding = activeEffects.some(e => e.name === 'bleeding');
+                const hasPoisoned = activeEffects.some(e => e.name === 'poisoned');
+                const hasParalyzed = activeEffects.some(e => e.name === 'paralyzed');
+                
+                if (hasParalyzed) {
+                    hpElement.style.color = '#888888'; // Gray for paralyzed
+                } else if (hasBleeding) {
+                    hpElement.style.color = '#ff4444'; // Red for bleeding
+                } else if (hasPoisoned) {
+                    hpElement.style.color = '#00ff00'; // Green for poisoned
+                } else {
+                    hpElement.style.color = '#ffaa00'; // Orange for other effects
+                }
+            } else {
+                hpElement.style.color = ''; // Reset to default
+            }
+        }
+        
         document.getElementById('player-level').textContent = `Level: ${player.level}`;
         document.getElementById('player-exp').textContent = `Exp: ${player.exp}/${player.expToNext}`;
         document.getElementById('player-pos').textContent = `Position: (${player.x},${player.y})`;
@@ -335,6 +360,44 @@ class Renderer {
             if (document.getElementById('player-blockchance')) {
                 document.getElementById('player-blockchance').textContent = `BC: ${stats.blockChance || 0}%`;
             }
+            
+            // Display total resistances
+            if (player.getStatusResistance) {
+                const resistances = [];
+                const effectTypes = ['bleeding', 'stunned', 'fractured', 'poisoned', 'confused', 'paralyzed'];
+                
+                for (const type of effectTypes) {
+                    const resistance = player.getStatusResistance(type);
+                    if (resistance > 0) {
+                        const shortNames = {
+                            'bleeding': 'Bld',
+                            'stunned': 'Stn',
+                            'fractured': 'Frc',
+                            'poisoned': 'Psn',
+                            'confused': 'Cnf',
+                            'paralyzed': 'Par'
+                        };
+                        resistances.push(`${shortNames[type]}:${resistance}%`);
+                    }
+                }
+                
+                // Display resistances in a dedicated element or after encumbrance
+                if (resistances.length > 0) {
+                    const resistText = 'Resist: ' + resistances.join(' ');
+                    // Try to find or create a resistance display element
+                    let resistElement = document.getElementById('resistance-status');
+                    if (!resistElement) {
+                        // If it doesn't exist, update encumbrance element
+                        const encumbranceElement = document.getElementById('encumbrance-status');
+                        if (encumbranceElement) {
+                            const baseText = stats.encumbranceLevel || '';
+                            encumbranceElement.textContent = baseText ? `${baseText} | ${resistText}` : resistText;
+                        }
+                    } else {
+                        resistElement.textContent = resistText;
+                    }
+                }
+            }
         }
         
         // Update detailed stats
@@ -346,6 +409,29 @@ class Renderer {
             document.getElementById('player-wis').textContent = `WIS: ${stats.wisdom}`;
             document.getElementById('player-cha').textContent = `CHA: ${stats.charisma}`;
         }
+        
+        // Update status effects display
+        const statusEffectsElement = document.getElementById('status-effects');
+        if (player.statusEffects && statusEffectsElement) {
+            const activeEffects = player.statusEffects.getActiveEffects();
+            if (activeEffects.length > 0) {
+                // Create classic status effect display - simple text, no fancy styling
+                const effectsDisplay = activeEffects.map(e => {
+                    const effectName = e.name.charAt(0).toUpperCase() + e.name.slice(1);
+                    return `${effectName}[${e.severity}](${e.duration}T)`;
+                }).join(' ');
+                
+                statusEffectsElement.textContent = `Status: ${effectsDisplay}`;
+                statusEffectsElement.style.display = 'block';
+                statusEffectsElement.style.color = '#ff6666'; // Simple unified color for all status effects
+            } else {
+                statusEffectsElement.innerHTML = '';
+                statusEffectsElement.style.display = 'none';
+            }
+        }
+        
+        // Update position display (keep it simple)
+        document.getElementById('player-pos').textContent = `Position: (${player.x},${player.y})`;
         
         // Update hunger status (Always visible detailed status)
         if (stats.hungerStatus) {

@@ -412,9 +412,13 @@ class Game {
                     
                     // Combat stats
                     toHit: this.player.toHit,
+                    baseToHit: this.player.baseToHit,
                     armorClass: this.player.armorClass,
                     damage: this.player.damage,
                     weaponDamage: this.player.weaponDamage,
+                    penetration: this.player.penetration,
+                    totalProtection: this.player.totalProtection,
+                    blockChance: this.player.blockChance,
                     
                     // Game mechanics
                     turnCount: this.player.turnCount,
@@ -425,6 +429,7 @@ class Game {
                     // Equipment and inventory
                     equipment: this.player.equipment,
                     inventory: this.player.inventory,
+                    maxInventorySize: this.player.maxInventorySize,
                     
                     // Hunger system (classic roguelike - NetHack style)
                     nutrition: this.player.nutrition,
@@ -433,7 +438,19 @@ class Game {
                     
                     // Weight system
                     currentWeight: this.player.currentWeight,
-                    maxWeight: this.player.maxWeight
+                    maxWeight: this.player.maxWeight,
+                    
+                    // Status effects
+                    statusEffects: this.player.statusEffects ? {
+                        effects: Array.from(this.player.statusEffects.effects.entries()).map(([type, effect]) => ({
+                            type: type,
+                            duration: effect.duration,
+                            severity: effect.severity,
+                            source: effect.source
+                        })),
+                        immunities: Array.from(this.player.statusEffects.immunities),
+                        savingThrowBonus: this.player.statusEffects.savingThrowBonus
+                    } : null
                 } : null,
                 
                 // Level data (serialize Map to array)
@@ -654,7 +671,22 @@ class Game {
                 fleeStamina: monster.fleeStamina,
                 fleeStyle: monster.fleeStyle,
                 returnCourage: monster.returnCourage,
-                fleeTimer: monster.fleeTimer
+                fleeTimer: monster.fleeTimer,
+                // Saving throw stats
+                constitution: monster.constitution,
+                wisdom: monster.wisdom,
+                strength: monster.strength,
+                // Status effects
+                statusEffects: monster.statusEffects ? {
+                    effects: Array.from(monster.statusEffects.effects.entries()).map(([type, effect]) => ({
+                        type: type,
+                        duration: effect.duration,
+                        severity: effect.severity,
+                        source: effect.source
+                    })),
+                    immunities: Array.from(monster.statusEffects.immunities),
+                    savingThrowBonus: monster.statusEffects.savingThrowBonus
+                } : null
             }))
         };
     }
@@ -722,6 +754,39 @@ class Game {
             monster.returnCourage = monsterInfo.returnCourage || 0.5;
             monster.fleeTimer = monsterInfo.fleeTimer || 0;
             
+            // Restore saving throw stats
+            monster.constitution = monsterInfo.constitution || 10;
+            monster.wisdom = monsterInfo.wisdom || 10;
+            monster.strength = monsterInfo.strength || 10;
+            
+            // Restore status effects
+            if (monsterInfo.statusEffects && monsterInfo.statusEffects.effects) {
+                // Create new StatusEffectManager if it doesn't exist
+                if (!monster.statusEffects) {
+                    monster.statusEffects = new StatusEffectManager(monster);
+                }
+                
+                // Restore immunities
+                if (monsterInfo.statusEffects.immunities) {
+                    monster.statusEffects.immunities = new Set(monsterInfo.statusEffects.immunities);
+                }
+                
+                // Restore saving throw bonus
+                if (monsterInfo.statusEffects.savingThrowBonus !== undefined) {
+                    monster.statusEffects.savingThrowBonus = monsterInfo.statusEffects.savingThrowBonus;
+                }
+                
+                // Restore active effects
+                monsterInfo.statusEffects.effects.forEach(effectData => {
+                    monster.statusEffects.addEffect(
+                        effectData.type, 
+                        effectData.duration, 
+                        effectData.severity, 
+                        effectData.source
+                    );
+                });
+            }
+            
             return monster;
         });
         
@@ -761,6 +826,18 @@ class Game {
                     cursed: item.cursed,
                     identified: item.identified,
                     value: item.value,
+                    
+                    // Durability system
+                    durability: item.durability,
+                    maxDurability: item.maxDurability,
+                    currentDurability: item.currentDurability,
+                    
+                    // Weapon type and combat properties
+                    weaponType: item.weaponType,
+                    penetration: item.penetration,
+                    protection: item.protection,
+                    blockChance: item.blockChance,
+                    resistances: item.resistances,
                     
                     // Food specific properties
                     nutrition: item.nutrition,
@@ -930,9 +1007,13 @@ class Game {
         
         // Combat stats
         player.toHit = playerData.toHit;
+        player.baseToHit = playerData.baseToHit || playerData.toHit; // Fallback for old saves
         player.armorClass = playerData.armorClass;
         player.damage = playerData.damage;
         player.weaponDamage = playerData.weaponDamage;
+        player.penetration = playerData.penetration || 0;
+        player.totalProtection = playerData.totalProtection || 0;
+        player.blockChance = playerData.blockChance || 0;
         
         // Game mechanics
         player.turnCount = playerData.turnCount;
@@ -943,6 +1024,7 @@ class Game {
         // Equipment and inventory
         player.equipment = playerData.equipment || {};
         player.inventory = playerData.inventory || [];
+        player.maxInventorySize = playerData.maxInventorySize || 26;
         
         // Restore hunger system
         player.nutrition = playerData.nutrition || 500;
@@ -954,6 +1036,34 @@ class Game {
         player.maxWeight = playerData.maxWeight || 0;
         if (player.maxWeight === 0) {
             player.calculateWeightCapacity(); // Recalculate if missing
+        }
+        
+        // Restore status effects
+        if (playerData.statusEffects && playerData.statusEffects.effects) {
+            // Create new StatusEffectManager if it doesn't exist
+            if (!player.statusEffects) {
+                player.statusEffects = new StatusEffectManager(player);
+            }
+            
+            // Restore immunities
+            if (playerData.statusEffects.immunities) {
+                player.statusEffects.immunities = new Set(playerData.statusEffects.immunities);
+            }
+            
+            // Restore saving throw bonus
+            if (playerData.statusEffects.savingThrowBonus !== undefined) {
+                player.statusEffects.savingThrowBonus = playerData.statusEffects.savingThrowBonus;
+            }
+            
+            // Restore active effects
+            playerData.statusEffects.effects.forEach(effectData => {
+                player.statusEffects.addEffect(
+                    effectData.type, 
+                    effectData.duration, 
+                    effectData.severity, 
+                    effectData.source
+                );
+            });
         }
         
         return player;
@@ -1282,6 +1392,9 @@ class Game {
         
         const moved = this.player.tryMove(dx, dy, this.dungeon, this.monsterSpawner);
         
+        // Remove dead monsters immediately after player action
+        this.monsterSpawner.removeDeadMonsters();
+        
         if (moved) {
             // Check for stairs
             const tile = this.dungeon.getTile(this.player.x, this.player.y);
@@ -1452,6 +1565,22 @@ class Game {
         // Check player regeneration (now hunger-dependent)
         this.player.checkRegeneration();
         
+        // Process player status effects
+        if (this.player.statusEffects) {
+            const result = this.player.statusEffects.processTurn();
+            if (result.damage > 0) {
+                this.player.takeDamage(result.damage, 0);
+                if (this.renderer) {
+                    this.renderer.addLogMessage(`You take ${result.damage} damage from status effects!`, 'damage');
+                }
+            }
+            for (const message of result.messages) {
+                if (this.renderer) {
+                    this.renderer.addLogMessage(message);
+                }
+            }
+        }
+        
         // Update field of vision after player moves
         this.updateFOV();
         
@@ -1516,6 +1645,29 @@ class Game {
      */
     processMonsterTurn(monster) {
         if (!monster.isAlive) return;
+        
+        // Process monster status effects
+        if (monster.statusEffects) {
+            // Check if monster can act (stunned/paralyzed might prevent action)
+            if (!monster.statusEffects.canAct()) {
+                return; // Monster is stunned/paralyzed and cannot act this turn
+            }
+            
+            const result = monster.statusEffects.processTurn();
+            if (result.damage > 0) {
+                monster.takeDamage(result.damage);
+                if (this.renderer) {
+                    this.renderer.addLogMessage(`The ${monster.name} takes ${result.damage} damage from status effects!`);
+                }
+                if (!monster.isAlive) {
+                    if (this.renderer) {
+                        this.renderer.addLogMessage(`The ${monster.name} dies from its wounds!`, 'victory');
+                    }
+                    this.player.gainExp(monster.expValue);
+                    return;
+                }
+            }
+        }
         
         // Check if monster should wake up (always check, even if asleep)
         monster.checkWakeUpConditions(this.player.x, this.player.y);
@@ -1611,6 +1763,36 @@ class Game {
      * Move monster towards a target position with pack coordination (surrounding tactics)
      */
     moveMonsterTowards(monster, targetX, targetY) {
+        // Check for status effect movement restrictions
+        if (monster.statusEffects) {
+            // Apply movement speed penalty
+            const movementMod = monster.statusEffects.getMovementModifier();
+            if (movementMod <= 0 || Math.random() > movementMod) {
+                // Monster is too injured/stunned to move this turn
+                return;
+            }
+            
+            // Check if confused - randomize movement
+            if (monster.statusEffects.shouldRandomizeMovement()) {
+                // Random movement instead of toward target
+                const directions = [
+                    [-1, -1], [0, -1], [1, -1],
+                    [-1, 0],           [1, 0],
+                    [-1, 1],  [0, 1],  [1, 1]
+                ];
+                const randomDir = directions[Math.floor(Math.random() * directions.length)];
+                const newX = monster.x + randomDir[0];
+                const newY = monster.y + randomDir[1];
+                
+                if (this.dungeon.isWalkable(newX, newY) && 
+                    !this.monsterSpawner.getMonsterAt(newX, newY) &&
+                    !(newX === this.player.x && newY === this.player.y)) {
+                    this.executeMonsterMove(monster, newX, newY);
+                }
+                return;
+            }
+        }
+        
         // Get all nearby monsters for pack coordination
         const nearbyMonsters = this.monsterSpawner.getLivingMonsters().filter(m => 
             m !== monster && !m.isAsleep && !m.isFleeing &&
