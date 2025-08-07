@@ -133,11 +133,11 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 150px;
+    min-height: 100px;
 }
 
 #log-container {
-    max-height: 250px;
+    max-height: 200px;
     overflow-y: auto;
     font-size: 11px;
     line-height: 1.2;
@@ -402,7 +402,8 @@ body {
     margin: 0;
     border-radius: 0;
     flex-shrink: 0;
-    min-height: 120px;
+    min-height: 100px;
+    max-height: 140px;
 }
 
 .visible-monsters h3 {
@@ -417,7 +418,7 @@ body {
 }
 
 #visible-monsters-container {
-    max-height: 120px;
+    max-height: 110px;
     overflow-y: auto;
     font-size: 11px;
     line-height: 1.2;
@@ -438,7 +439,8 @@ body {
     margin: 0;
     border-radius: 0;
     flex-shrink: 0;
-    min-height: 100px;
+    min-height: 80px;
+    max-height: 120px;
 }
 
 .nearby-items h3 {
@@ -453,7 +455,7 @@ body {
 }
 
 #nearby-items-container {
-    max-height: 100px;
+    max-height: 90px;
     overflow-y: auto;
     font-size: 11px;
     line-height: 1.2;
