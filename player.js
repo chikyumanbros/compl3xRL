@@ -360,6 +360,33 @@ class Player {
                     const doorPenetration = 5; // High AP - doors can crush through heavy armor
                     monster.takeDamage(finalDamage, doorPenetration);
                     
+                    // Check for status effects from door slam (only if monster is still alive)
+                    if (finalDamage > 0 && monster.hp > 0) {
+                        // Check if status effect function is available
+                        if (typeof calculateStatusEffectChance === 'function' && monster.statusEffects) {
+                            const maxDamage = monster.maxHp;
+                            
+                            // Check each possible status effect for door slam
+                            const possibleEffects = ['stunned', 'fractured', 'bleeding'];
+                            for (const effectType of possibleEffects) {
+                                try {
+                                    const effect = calculateStatusEffectChance('door_slam', effectType, finalDamage, maxDamage);
+                                    if (effect && monster.statusEffects) {
+                                        monster.statusEffects.addEffect(effect.type, effect.duration, effect.severity, 'door slam');
+                                        
+                                        // Log status effect application
+                                        if (window.game && window.game.renderer) {
+                                            const effectName = effect.type.charAt(0).toUpperCase() + effect.type.slice(1);
+                                            window.game.renderer.addBattleLogMessage(`${monster.name} is ${effect.type}! [${effectName} ${effect.severity}]`, 'damage');
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error(`Error applying door slam status effect ${effectType}:`, error);
+                                }
+                            }
+                        }
+                    }
+                    
                     if (!monster.isAlive) {
                         if (window.game && window.game.renderer) {
                             window.game.renderer.addBattleLogMessage(`You defeat the ${monster.name}!`, 'victory');
