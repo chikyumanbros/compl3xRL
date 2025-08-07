@@ -1660,13 +1660,8 @@ class Game {
     processMonsterTurn(monster) {
         if (!monster.isAlive) return;
         
-        // Process monster status effects
+        // Process monster status effects (always process damage effects)
         if (monster.statusEffects) {
-            // Check if monster can act (stunned/paralyzed might prevent action)
-            if (!monster.statusEffects.canAct()) {
-                return; // Monster is stunned/paralyzed and cannot act this turn
-            }
-            
             const result = monster.statusEffects.processTurn();
             if (result.damage > 0) {
                 if (this.renderer) {
@@ -1697,7 +1692,12 @@ class Game {
             return; // Skip action this turn
         }
         
-        // Check if monster should flee (Angband-style)
+        // Check if monster should flee (Angband-style) - only if monster can act
+        // Stunned/paralyzed monsters cannot make flee decisions
+        if (monster.statusEffects && !monster.statusEffects.canAct()) {
+            return; // Monster is too stunned/paralyzed to make any decisions
+        }
+        
         monster.checkFleeCondition();
         
         // Calculate distance to player
