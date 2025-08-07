@@ -1342,6 +1342,28 @@ class Monster {
     }
     
     /**
+     * Take direct damage bypassing armor/DR (for status effects)
+     */
+    takeDirectDamage(damage) {
+        const oldHp = this.hp;
+        this.hp = Math.max(0, this.hp - damage);
+        
+        // Add HP status to battle log
+        if (window.game && window.game.renderer) {
+            const hpDisplay = this.hp <= 0 ? '0' : this.hp;
+            window.game.renderer.addBattleLogMessage(`${this.name}: ${hpDisplay}/${this.maxHp} HP`, 'damage');
+        }
+        
+        if (this.hp <= 0) {
+            this.hp = 0;
+            this.isAlive = false;
+            // Death message will be handled by the caller
+        }
+        
+        return damage;
+    }
+    
+    /**
      * Attack the player (Classic Roguelike - THAC0 style)
      */
     attackPlayer(player) {

@@ -29,7 +29,8 @@ class StatusEffect {
         const severityNames = ['light', 'moderate', 'severe'];
         return {
             name: this.type,
-            severity: severityNames[this.severity - 1],
+            severity: this.severity, // Keep as number for display
+            severityName: severityNames[this.severity - 1], // Add separate name field
             duration: this.duration,
             description: this.getDescription()
         };
@@ -159,6 +160,17 @@ class StatusEffectManager {
             // Tick duration
             if (!effect.tick()) {
                 results.expired.push(type);
+                // Add natural expiry message
+                const target = this.entity === window.game?.player ? 'You' : `The ${this.entity?.name || 'monster'}`;
+                const endMessages = {
+                    bleeding: `${target} stopped bleeding.`,
+                    stunned: `${target} recovered from stun.`,
+                    fractured: `${target}'s fracture has healed.`,
+                    poisoned: `${target} recovered from poison.`,
+                    confused: `${target} regained clarity.`,
+                    paralyzed: `${target} can move again.`
+                };
+                results.messages.push(endMessages[type] || `${target} recovered from ${type}.`);
             } else {
                 // Attempt saving throw for recovery
                 if (this.attemptSavingThrow(type, effect)) {
@@ -168,9 +180,12 @@ class StatusEffectManager {
             }
         }
         
-        // Remove expired effects
+        // Remove expired effects (without logging - we'll handle messages later)
         for (const type of results.expired) {
-            this.removeEffect(type);
+            if (this.effects.has(type)) {
+                this.effects.delete(type);
+                // Don't call logEffectEnd here - let the caller handle the message order
+            }
         }
         
         return results;
@@ -337,7 +352,7 @@ class StatusEffectManager {
         if (!window.game || !window.game.renderer) return;
         
         const severityText = ['lightly', 'moderately', 'severely'][severity - 1];
-        const target = this.entity === window.game.player ? 'You are' : 'The monster is';
+        const target = this.entity === window.game.player ? 'You are' : `The ${this.entity.name || 'monster'} is`;
         
         const messages = {
             bleeding: `${target} ${severityText} bleeding!`,
@@ -357,7 +372,7 @@ class StatusEffectManager {
     logEffectEnd(type) {
         if (!window.game || !window.game.renderer) return;
         
-        const target = this.entity === window.game.player ? 'You' : 'The monster';
+        const target = this.entity === window.game.player ? 'You' : `The ${this.entity.name || 'monster'}`;
         
         const messages = {
             bleeding: `${target} stopped bleeding.`,

@@ -605,7 +605,8 @@ class Renderer {
                 directionText: directionText,
                 hp: monster.hp,
                 maxHp: monster.maxHp,
-                isAsleep: monster.isAsleep
+                isAsleep: monster.isAsleep,
+                statusEffects: monster.statusEffects // Include status effects
             };
         }).sort((a, b) => a.distance - b.distance); // Sort by distance
     }
@@ -670,6 +671,23 @@ class Renderer {
                     hpDiv.style.paddingLeft = '20px';
                     hpDiv.textContent = `HP: ${monster.hp}/${monster.maxHp}`;
                     monsterDiv.appendChild(hpDiv);
+                }
+                
+                // Add status effects if monster has any
+                if (monster.statusEffects) {
+                    const activeEffects = monster.statusEffects.getActiveEffects();
+                    if (activeEffects.length > 0) {
+                        const statusDiv = document.createElement('div');
+                        statusDiv.style.fontSize = '10px';
+                        statusDiv.style.color = '#ffcc66';
+                        statusDiv.style.paddingLeft = '20px';
+                        const effectsDisplay = activeEffects.map(e => {
+                            const effectName = e.name.charAt(0).toUpperCase() + e.name.slice(1);
+                            return `${effectName}[${e.severity}](${e.duration}T)`;
+                        }).join(' ');
+                        statusDiv.textContent = `Status: ${effectsDisplay}`;
+                        monsterDiv.appendChild(statusDiv);
+                    }
                 }
                 
                 container.appendChild(monsterDiv);

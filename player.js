@@ -593,6 +593,42 @@ class Player {
     }
     
     /**
+     * Take direct damage bypassing armor/DR/block (for status effects)
+     */
+    takeDirectDamage(damage) {
+        const oldHp = this.hp;
+        this.hp = Math.max(0, this.hp - damage);
+        
+        // Add HP status to battle log
+        if (window.game && window.game.renderer) {
+            const hpDisplay = this.hp <= 0 ? '0' : this.hp;
+            window.game.renderer.addBattleLogMessage(`You: ${hpDisplay}/${this.maxHp} HP`, 'damage');
+        }
+        
+        if (this.hp <= 0) {
+            this.hp = 0;
+            if (window.game && window.game.renderer) {
+                window.game.renderer.addBattleLogMessage('You have died!', 'death');
+            }
+            return true; // Player died
+        }
+        
+        // Update combat stats if HP threshold changed
+        const oldHpPercent = oldHp / this.maxHp;
+        const newHpPercent = this.hp / this.maxHp;
+        const oldWounded = oldHpPercent < 0.5;
+        const newWounded = newHpPercent < 0.5;
+        const oldSeverelyWounded = oldHpPercent < 0.25;
+        const newSeverelyWounded = newHpPercent < 0.25;
+        
+        if (oldWounded !== newWounded || oldSeverelyWounded !== newSeverelyWounded) {
+            this.updateCombatStats();
+        }
+        
+        return false; // Player survived
+    }
+    
+    /**
      * Attack a monster (Classic Roguelike - THAC0 style)
      */
     attackMonster(monster) {
@@ -694,6 +730,12 @@ class Player {
             const encumbrance = this.getEncumbranceLevel();
             const combatCost = this.getCombatHungerCost(encumbrance);
             this.consumeNutrition(combatCost);
+            
+            // Force UI update after combat to show status effects immediately
+            if (window.game && window.game.renderer) {
+                const livingMonsters = window.game.monsterSpawner ? window.game.monsterSpawner.getLivingMonsters() : [];
+                window.game.renderer.updateVisibleMonsters(livingMonsters, window.game.fov, this.x, this.y);
+            }
         } else {
             // Miss
             if (window.game && window.game.renderer) {

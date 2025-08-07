@@ -1577,12 +1577,14 @@ class Game {
         // Process player status effects
         if (this.player.statusEffects) {
             const result = this.player.statusEffects.processTurn();
+            // Log damage first if any
             if (result.damage > 0) {
-                this.player.takeDamage(result.damage, 0);
                 if (this.renderer) {
                     this.renderer.addLogMessage(`You take ${result.damage} damage from status effects!`, 'damage');
                 }
+                this.player.takeDirectDamage(result.damage);
             }
+            // Then log other messages (recovery, etc.)
             for (const message of result.messages) {
                 if (this.renderer) {
                     this.renderer.addLogMessage(message);
@@ -1667,10 +1669,10 @@ class Game {
             
             const result = monster.statusEffects.processTurn();
             if (result.damage > 0) {
-                monster.takeDamage(result.damage);
                 if (this.renderer) {
                     this.renderer.addLogMessage(`The ${monster.name} takes ${result.damage} damage from status effects!`);
                 }
+                monster.takeDirectDamage(result.damage);
                 if (!monster.isAlive) {
                     if (this.renderer) {
                         this.renderer.addLogMessage(`The ${monster.name} dies from its wounds!`, 'victory');
