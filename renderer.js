@@ -855,10 +855,8 @@ class Renderer {
             if (equipment.helmet) {
                 const helmet = equipment.helmet;
                 const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(helmet);
-                const enchantDisplay = helmet.enchantment > 0 ? `+${helmet.enchantment} ` : 
-                                      helmet.enchantment < 0 ? `${helmet.enchantment} ` : '';
                 
-                helmetSlot.textContent = `Helmet: ${enchantDisplay}${helmet.name}${qualityText}${conditionText}${statsText}`;
+                helmetSlot.textContent = `Helmet: ${helmet.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 helmetSlot.textContent = `Helmet: None`;
             }
@@ -870,10 +868,8 @@ class Renderer {
             if (equipment.gloves) {
                 const gloves = equipment.gloves;
                 const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(gloves);
-                const enchantDisplay = gloves.enchantment > 0 ? `+${gloves.enchantment} ` : 
-                                      gloves.enchantment < 0 ? `${gloves.enchantment} ` : '';
                 
-                glovesSlot.textContent = `Gloves: ${enchantDisplay}${gloves.name}${qualityText}${conditionText}${statsText}`;
+                glovesSlot.textContent = `Gloves: ${gloves.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 glovesSlot.textContent = `Gloves: None`;
             }
@@ -885,10 +881,8 @@ class Renderer {
             if (equipment.boots) {
                 const boots = equipment.boots;
                 const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(boots);
-                const enchantDisplay = boots.enchantment > 0 ? `+${boots.enchantment} ` : 
-                                      boots.enchantment < 0 ? `${boots.enchantment} ` : '';
                 
-                bootsSlot.textContent = `Boots: ${enchantDisplay}${boots.name}${qualityText}${conditionText}${statsText}`;
+                bootsSlot.textContent = `Boots: ${boots.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 bootsSlot.textContent = `Boots: None`;
             }

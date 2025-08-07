@@ -625,59 +625,31 @@ class SubWindow {
         this.title.textContent = 'Remove equipment';
         this.content.innerHTML = '';
         this.input.style.display = 'flex';
-        this.textInput.placeholder = 'Enter slot letter or Cancel';
+        this.textInput.placeholder = 'Enter number or Cancel';
         this.textInput.value = '';
         
-        const equipment = player.equipment;
+        const equipped = player.getEquipmentSummary();
         
-        // Define equipment slots with their display letters (same as equipment menu)
-        const equipmentSlots = [
-            { key: 'weapon', letter: 'w', name: 'Weapon' },
-            { key: 'armor', letter: 'a', name: 'Armor' },
-            { key: 'shield', letter: 's', name: 'Shield' },
-            { key: 'helmet', letter: 'h', name: 'Helmet' },
-            { key: 'gloves', letter: 'g', name: 'Gloves' },
-            { key: 'boots', letter: 'b', name: 'Boots' },
-            { key: 'ring1', letter: 'r', name: 'Ring (L)' },
-            { key: 'ring2', letter: '1', name: 'Ring (R)' },
-            { key: 'amulet', letter: 'm', name: 'Amulet' }
-        ];
-        
-        // Filter to only show equipped items
-        const equippedSlots = equipmentSlots.filter(slot => equipment[slot.key]);
-        
-        if (equippedSlots.length === 0) {
+        if (equipped.length === 0) {
             this.content.innerHTML = '<div style="color: #808080; font-style: italic;">You are not wearing anything.</div>';
             this.input.style.display = 'none';
         } else {
-            equippedSlots.forEach(slot => {
-                const item = equipment[slot.key];
-                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(item);
-                const enchantDisplay = item.enchantment > 0 ? `+${item.enchantment} ` : 
-                                      item.enchantment < 0 ? `${item.enchantment} ` : '';
-                
+            equipped.forEach((item, index) => {
                 const itemDiv = document.createElement('div');
-                itemDiv.textContent = `${slot.letter}) ${slot.name}: ${enchantDisplay}${item.name}${qualityText}${conditionText}${statsText}`;
+                itemDiv.textContent = `${index + 1} - ${item}`;
                 this.content.appendChild(itemDiv);
             });
-            
-            // Add help text
-            const helpDiv = document.createElement('div');
-            helpDiv.style.marginTop = '10px';
-            helpDiv.style.color = '#888';
-            helpDiv.style.fontSize = '11px';
-            helpDiv.textContent = 'Enter the letter of the equipment slot to remove.';
-            this.content.appendChild(helpDiv);
         }
         
         this.callback = (choice) => {
-            if (choice && choice.length === 1) {
-                const input = choice.toLowerCase().trim();
+            if (choice && !isNaN(choice)) {
+                const index = parseInt(choice) - 1;
+                const slots = Object.keys(player.equipment);
+                const equippedSlots = slots.filter(slot => player.equipment[slot]);
                 
-                // Find equipment slot by letter
-                const slot = equippedSlots.find(s => s.letter === input);
-                if (slot && equipment[slot.key]) {
-                    const success = player.unequipToInventory(slot.key);
+                if (index >= 0 && index < equippedSlots.length) {
+                    const slot = equippedSlots[index];
+                    const success = player.unequipToInventory(slot);
                     if (success && window.game) {
                         // Process monster turns after equipment change
                         window.game.processMonsterTurns();
@@ -690,9 +662,6 @@ class SubWindow {
                     }
                     return true; // Close menu after attempting to unequip
                 } else {
-                    if (window.game && window.game.renderer) {
-                        window.game.renderer.addLogMessage('Invalid slot. Use the letter shown for equipped items.');
-                    }
                     return false; // Keep menu open if invalid selection
                 }
             }
@@ -886,10 +855,10 @@ class SubWindow {
      * Show item selection menu for picking up items
      */
     showItemSelectionMenu(items, playerX, playerY) {
-        this.title.textContent = 'Pick up item (1-9 to select, * for all, Escape to cancel)';
+        this.title.textContent = 'Pick up item (a-z to select, * for all, Escape to cancel)';
         this.content.innerHTML = '';
         this.input.style.display = 'flex';
-        this.textInput.placeholder = 'Enter number (1-9) or * for all';
+        this.textInput.placeholder = 'Enter letter (a-z) or * for all';
         this.textInput.value = '';
         
         if (items.length === 0) {
@@ -906,7 +875,8 @@ class SubWindow {
                     displayText = `${item.name} (${item.quantity})`;
                 }
                 
-                itemDiv.textContent = `${index + 1} - ${displayText}`;
+                const letter = String.fromCharCode(97 + index); // a, b, c, ...
+                itemDiv.textContent = `${letter} - ${displayText}`;
                 this.content.appendChild(itemDiv);
             });
             
@@ -915,7 +885,7 @@ class SubWindow {
             instructionDiv.style.color = '#808080';
             instructionDiv.style.fontSize = '0.9em';
             instructionDiv.style.marginTop = '10px';
-            instructionDiv.textContent = 'Enter a number (1-' + items.length + ') or "*" to pick up all items';
+            instructionDiv.textContent = 'Enter a letter (a-' + String.fromCharCode(97 + items.length - 1) + ') or "*" to pick up all items';
             this.content.appendChild(instructionDiv);
         }
         
@@ -924,8 +894,8 @@ class SubWindow {
                 // Pick up all items
                 this.pickupAllItems(items, playerX, playerY);
                 return true; // Close menu after picking up all items
-            } else if (choice && /^[1-9]$/.test(choice)) {
-                const index = parseInt(choice) - 1;
+            } else if (choice && /^[a-z]$/.test(choice)) {
+                const index = choice.charCodeAt(0) - 97; // a=0, b=1, c=2, ...
                 
                 if (index >= 0 && index < items.length) {
                     const selectedItem = items[index];

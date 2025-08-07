@@ -456,13 +456,6 @@ const WEAPON_STATUS_EFFECTS = {
     'default': {
         bleeding: { chance: 0.10, severityRange: [1, 1] },
         stunned: { chance: 0.10, severityRange: [1, 1] }
-    },
-    
-    // Door slam - heavy crushing damage like a massive hammer
-    'door_slam': {
-        stunned: { chance: 0.40, severityRange: [1, 3] },     // High stun chance - crushing force
-        fractured: { chance: 0.35, severityRange: [1, 3] },   // High fracture chance - bone crushing
-        bleeding: { chance: 0.15, severityRange: [1, 2] }     // Moderate bleeding - external wounds
     }
 };
 
