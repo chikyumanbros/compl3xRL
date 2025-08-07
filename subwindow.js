@@ -625,31 +625,59 @@ class SubWindow {
         this.title.textContent = 'Remove equipment';
         this.content.innerHTML = '';
         this.input.style.display = 'flex';
-        this.textInput.placeholder = 'Enter number or Cancel';
+        this.textInput.placeholder = 'Enter slot letter or Cancel';
         this.textInput.value = '';
         
-        const equipped = player.getEquipmentSummary();
+        const equipment = player.equipment;
         
-        if (equipped.length === 0) {
+        // Define equipment slots with their display letters (same as equipment menu)
+        const equipmentSlots = [
+            { key: 'weapon', letter: 'w', name: 'Weapon' },
+            { key: 'armor', letter: 'a', name: 'Armor' },
+            { key: 'shield', letter: 's', name: 'Shield' },
+            { key: 'helmet', letter: 'h', name: 'Helmet' },
+            { key: 'gloves', letter: 'g', name: 'Gloves' },
+            { key: 'boots', letter: 'b', name: 'Boots' },
+            { key: 'ring1', letter: 'r', name: 'Ring (L)' },
+            { key: 'ring2', letter: '1', name: 'Ring (R)' },
+            { key: 'amulet', letter: 'm', name: 'Amulet' }
+        ];
+        
+        // Filter to only show equipped items
+        const equippedSlots = equipmentSlots.filter(slot => equipment[slot.key]);
+        
+        if (equippedSlots.length === 0) {
             this.content.innerHTML = '<div style="color: #808080; font-style: italic;">You are not wearing anything.</div>';
             this.input.style.display = 'none';
         } else {
-            equipped.forEach((item, index) => {
+            equippedSlots.forEach(slot => {
+                const item = equipment[slot.key];
+                const { qualityText, conditionText, statsText } = Player.getEquipmentDisplayInfo(item);
+                const enchantDisplay = item.enchantment > 0 ? `+${item.enchantment} ` : 
+                                      item.enchantment < 0 ? `${item.enchantment} ` : '';
+                
                 const itemDiv = document.createElement('div');
-                itemDiv.textContent = `${index + 1} - ${item}`;
+                itemDiv.textContent = `${slot.letter}) ${slot.name}: ${enchantDisplay}${item.name}${qualityText}${conditionText}${statsText}`;
                 this.content.appendChild(itemDiv);
             });
+            
+            // Add help text
+            const helpDiv = document.createElement('div');
+            helpDiv.style.marginTop = '10px';
+            helpDiv.style.color = '#888';
+            helpDiv.style.fontSize = '11px';
+            helpDiv.textContent = 'Enter the letter of the equipment slot to remove.';
+            this.content.appendChild(helpDiv);
         }
         
         this.callback = (choice) => {
-            if (choice && !isNaN(choice)) {
-                const index = parseInt(choice) - 1;
-                const slots = Object.keys(player.equipment);
-                const equippedSlots = slots.filter(slot => player.equipment[slot]);
+            if (choice && choice.length === 1) {
+                const input = choice.toLowerCase().trim();
                 
-                if (index >= 0 && index < equippedSlots.length) {
-                    const slot = equippedSlots[index];
-                    const success = player.unequipToInventory(slot);
+                // Find equipment slot by letter
+                const slot = equippedSlots.find(s => s.letter === input);
+                if (slot && equipment[slot.key]) {
+                    const success = player.unequipToInventory(slot.key);
                     if (success && window.game) {
                         // Process monster turns after equipment change
                         window.game.processMonsterTurns();
@@ -662,6 +690,9 @@ class SubWindow {
                     }
                     return true; // Close menu after attempting to unequip
                 } else {
+                    if (window.game && window.game.renderer) {
+                        window.game.renderer.addLogMessage('Invalid slot. Use the letter shown for equipped items.');
+                    }
                     return false; // Keep menu open if invalid selection
                 }
             }
