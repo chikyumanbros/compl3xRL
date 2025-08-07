@@ -1437,7 +1437,7 @@ const EQUIPMENT_TYPES = {
              type: 'potion',
              category: EQUIPMENT_CATEGORIES.HEALING_POTION,
              healDice: '1d4+1',
-                         healAmount: 5, // Fallback for compatibility
+             healAmount: 5, // Fallback for compatibility
             weight: 0.6,
              value: 25,
              symbol: '!',
@@ -1451,7 +1451,7 @@ const EQUIPMENT_TYPES = {
              type: 'potion',
              category: EQUIPMENT_CATEGORIES.HEALING_POTION,
              healDice: '4d4+4',
-                         healAmount: 20, // Fallback for compatibility
+             healAmount: 20, // Fallback for compatibility
             weight: 1.2,
              value: 200,
              symbol: '!',
@@ -2059,12 +2059,12 @@ class ItemManager {
                     if (typeof item.x === 'number' && typeof item.y === 'number' && item.symbol) {
                         this.addItem(item);
                         spawnedCount++;
-                        
+        
                         // Track location statistics
                         if (locationStats[positionData.locationType] !== undefined) {
                             locationStats[positionData.locationType]++;
-                        }
-                    } else {
+                    }
+                } else {
                         console.error(`Invalid item properties:`, item);
                     }
                 } else {
@@ -2144,8 +2144,8 @@ class ItemManager {
                     
                     // Check if position is valid and empty
                     if (this.dungeon.isInBounds(x, y)) {
-                        const tile = this.dungeon.getTile(x, y);
-                        if (tile.type === 'floor' && !this.hasItemAt(x, y)) {
+            const tile = this.dungeon.getTile(x, y);
+            if (tile.type === 'floor' && !this.hasItemAt(x, y)) {
                             positions.push({ x, y, distance: Math.abs(dx) + Math.abs(dy) });
                         }
                     }
@@ -2181,7 +2181,7 @@ class ItemManager {
         }
         
         if (validPositions.length === 0) {
-            return null;
+        return null;
         }
         
         // Debug info about terrain bias (only log occasionally)

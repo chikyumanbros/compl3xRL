@@ -28,6 +28,10 @@ class Game {
         this.monsterSpawner = null;
         this.itemManager = null;
         
+        // Monster detection for auto-stop feature
+        this.previouslyVisibleMonsters = new Set(); // Track monster IDs that were visible last turn
+        this.autoStopEnabled = true; // Allow disabling the feature if needed
+        
         this.setupGame();
     }
     
@@ -1164,6 +1168,11 @@ class Game {
         }
         this.lastKeyTime = now;
         
+        // Check for monster detection if auto-stop is enabled (only during key repeat)
+        if (this.autoStopEnabled && event.repeat && this.shouldStopForMonsterDetection()) {
+            return; // Stop processing input if new monster detected during continuous movement
+        }
+        
         if (this.gameState === 'door_closing') {
             this.handleDoorClosingInput(event);
             return;
@@ -1583,6 +1592,9 @@ class Game {
         
         // Update field of vision after player moves
         this.updateFOV();
+        
+        // Update visible monster tracking for auto-stop feature
+        this.updateVisibleMonsterTracking();
         
         // Process energy-based turns for all entities
         this.processEnergyTurns();
@@ -3006,6 +3018,64 @@ class Game {
         
         // Update UI
         this.renderer.updateUI(this.player, livingMonsters, this.fov);
+    }
+    
+    /**
+     * Check if movement should be stopped due to newly visible monsters
+     */
+    shouldStopForMonsterDetection() {
+        if (!this.autoStopEnabled || !this.fov || !this.monsterSpawner) {
+            return false;
+        }
+        
+        const currentlyVisibleMonsters = this.getCurrentlyVisibleMonsters();
+        
+        // Check for newly visible monsters
+        for (const monsterId of currentlyVisibleMonsters) {
+            if (!this.previouslyVisibleMonsters.has(monsterId)) {
+                // New monster detected! Stop movement
+                if (this.renderer) {
+                    this.renderer.addLogMessage("You spot a monster and stop moving!", 'warning');
+                }
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Get currently visible monster IDs
+     */
+    getCurrentlyVisibleMonsters() {
+        const visibleMonsters = new Set();
+        
+        if (!this.fov || !this.monsterSpawner) {
+            return visibleMonsters;
+        }
+        
+        const livingMonsters = this.monsterSpawner.getLivingMonsters();
+        for (const monster of livingMonsters) {
+            if (this.fov.getTileVisibility(monster.x, monster.y).visible) {
+                // Use monster's unique identifier (position-based ID for consistency)
+                const monsterId = `${monster.name}_${monster.x}_${monster.y}_${monster.hp}`;
+                visibleMonsters.add(monsterId);
+            }
+        }
+        
+        return visibleMonsters;
+    }
+    
+    /**
+     * Update the tracking of visible monsters for auto-stop feature
+     */
+    updateVisibleMonsterTracking() {
+        if (!this.autoStopEnabled) {
+            return;
+        }
+        
+        // Update the set of previously visible monsters
+        this.previouslyVisibleMonsters = this.getCurrentlyVisibleMonsters();
     }
 }
 
