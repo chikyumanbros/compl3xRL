@@ -1143,8 +1143,9 @@ class Game {
         return null;
     }
     
-    beginThrowDirectionSelection(letter) {
-        this.awaitingThrowDirection = { letter };
+    beginThrowDirectionSelection(selection) {
+        // selection can be a letter (inventory) or { equipSlot: 'weapon'|'shield' }
+        this.awaitingThrowDirection = typeof selection === 'string' ? { letter: selection } : selection;
         if (this.renderer) this.renderer.addLogMessage('Throw in which direction?');
     }
     
@@ -1152,19 +1153,35 @@ class Game {
         const state = this.awaitingThrowDirection;
         this.awaitingThrowDirection = null;
         if (!state || !this.player) return;
-        const item = this.player.getInventoryItem(state.letter);
-        if (!item) {
-            if (this.renderer) this.renderer.addLogMessage('No such item.', 'normal');
-            return;
+        let projectile = null;
+        if (state.equipSlot) {
+            // Throw equipped weapon/shield directly
+            const slot = state.equipSlot;
+            const equipped = this.player.equipment && this.player.equipment[slot];
+            if (!equipped) {
+                if (this.renderer) this.renderer.addLogMessage('Nothing equipped there.', 'normal');
+                return;
+            }
+            // Unequip to projectile, slot becomes empty
+            this.player.equipment[slot] = null;
+            projectile = equipped;
+            // Update stats/weight after unequip
+            this.player.updateCombatStats();
+            this.player.updateCurrentWeight();
+        } else {
+            const item = this.player.getInventoryItem(state.letter);
+            if (!item) {
+                if (this.renderer) this.renderer.addLogMessage('No such item.', 'normal');
+                return;
+            }
+            // Remove one unit (stack-aware)
+            const removed = this.player.removeFromInventoryByLetter(state.letter, 1);
+            if (!removed) {
+                if (this.renderer) this.renderer.addLogMessage('You cannot throw that.', 'normal');
+                return;
+            }
+            projectile = removed;
         }
-        
-        // Remove one unit (stack-aware)
-        const removed = this.player.removeFromInventoryByLetter(state.letter, 1);
-        if (!removed) {
-            if (this.renderer) this.renderer.addLogMessage('You cannot throw that.', 'normal');
-            return;
-        }
-        const projectile = removed;
         
         // Compute max range based on strength/dexterity and item weight
         const strMod = this.player.getClassicModifier(this.player.strength);
@@ -1198,6 +1215,15 @@ class Game {
             const tile = this.dungeon.getTile(x, y);
             // Check collision with walls/closed doors
             if (tile.type === 'wall' || (tile.type === 'door' && tile.doorState !== 'open')) {
+                // Hard collision for non-potion thrown items
+                if (projectile.type !== 'potion') {
+                    if ((projectile.type === 'weapon' || projectile.weaponDamage) && typeof projectile.takeDurabilityDamage === 'function') {
+                        const broke = projectile.takeDurabilityDamage(1, 'thrown_wall');
+                        if (broke && this.renderer) {
+                            this.renderer.addBattleLogMessage(`Your ${projectile.name} breaks on the wall!`, 'warning');
+                        }
+                    }
+                }
                 break;
             }
             
@@ -1208,9 +1234,26 @@ class Game {
                 if (projectile.type === 'potion') {
                     this.handlePotionShatter(projectile, x, y, target);
                 } else {
-                    this.applyThrownHit(projectile, target);
-                    // Non-potion items drop at the impact tile
-                    this.dropProjectileAt(projectile, x, y);
+                    // Perform thrown to-hit check; on miss, continue flying past the target
+                    const distance = Math.max(Math.abs(x - startX), Math.abs(y - startY));
+                    const outcome = this.attemptThrownAttack(projectile, target, distance);
+                    if (outcome.hit) {
+                        // Non-potion items drop at the impact tile after a resolved hit
+                        this.dropProjectileAt(projectile, x, y);
+                        // Durability wear on thrown weapon on hit
+                        if ((projectile.type === 'weapon' || projectile.weaponDamage) && typeof projectile.takeDurabilityDamage === 'function') {
+                            const broke = projectile.takeDurabilityDamage(1, 'thrown_hit');
+                            if (broke && this.renderer) {
+                                this.renderer.addBattleLogMessage(`Your ${projectile.name} breaks on impact!`, 'warning');
+                            }
+                        }
+                        this.postPlayerAction();
+                        return;
+                    } else {
+                        // Miss: continue flight beyond this tile
+                        lastFreeX = x; lastFreeY = y;
+                        continue;
+                    }
                 }
                 this.postPlayerAction();
                 return;
@@ -1225,43 +1268,101 @@ class Game {
             this.handlePotionShatter(projectile, lastFreeX, lastFreeY, null);
         } else {
             this.dropProjectileAt(projectile, lastFreeX, lastFreeY);
+            // Durability wear on thrown item landing
+            if ((projectile.type === 'weapon' || projectile.weaponDamage) && typeof projectile.takeDurabilityDamage === 'function') {
+                const broke = projectile.takeDurabilityDamage(1, 'thrown_impact');
+                if (broke && this.renderer) {
+                    this.renderer.addBattleLogMessage(`Your ${projectile.name} breaks when it lands!`, 'warning');
+                }
+            }
             if (this.renderer) this.renderer.addLogMessage('You throw and it lands on the ground.');
         }
         this.postPlayerAction();
     }
     
-    applyThrownHit(projectile, monster) {
-        // Base damage by item kind
-        let damage = 0;
+    // Perform to-hit, detailed logging, damage + status resolution for thrown attacks
+    attemptThrownAttack(projectile, monster, distance) {
+        // Build thrown to-hit (align baseline with melee toHit, swap STR with DEX)
+        const base = this.player.toHit || 0;
+        const dexMod = this.player.getClassicModifier(this.player.dexterity);
+        const strMod = this.player.getClassicModifier(this.player.strength);
+        const weight = (typeof projectile.getEffectiveWeight === 'function') ? projectile.getEffectiveWeight() : (projectile.weight || 1);
+        const weightPenalty = -Math.floor(weight / 2);
+        const rangePenalty = -Math.floor(Math.max(0, distance - 1) / 2); // -1 per 2 tiles beyond 1
+        const weaponBonus = (projectile.toHitBonus && (projectile.type === 'weapon' || projectile.weaponType)) ? projectile.toHitBonus : 0;
+        const thrownMods = (dexMod - strMod) + weightPenalty + rangePenalty + weaponBonus;
+        const toHitThrown = base + thrownMods;
+        
+        // THAC0-style roll
+        const naturalRoll = Math.floor(Math.random() * 20) + 1;
+        const requiredRoll = monster.armorClass - toHitThrown;
+        
+        // Log attempt with breakdown (also when target is not visible)
+        if (this.renderer) {
+            const toHitText = toHitThrown >= 0 ? `+${toHitThrown}` : `${toHitThrown}`;
+            const baseText = base >= 0 ? `+${base}` : `${base}`;
+            const modsText = thrownMods >= 0 ? `+${thrownMods}` : `${thrownMods}`;
+            const details = `range${distance}, w${Math.floor(weight)}`;
+            const targetName = (this.fov && this.fov.isVisible(monster.x, monster.y)) ? monster.name : 'something';
+            this.renderer.addBattleLogMessage(`You throw ${projectile.name} at ${targetName}... (${naturalRoll} vs ${requiredRoll}+ needed, AC ${monster.armorClass}, hit${toHitText} (base${baseText}, mods${modsText}), ${details})`);
+        }
+        
+        if (naturalRoll < requiredRoll && naturalRoll !== 20) {
+            if (this.renderer) this.renderer.addBattleLogMessage('Miss!');
+            return { hit: false };
+        }
+        
+        // Compute damage
         const isWeapon = projectile.type === 'weapon' || projectile.weaponDamage;
-        if (projectile.type === 'potion') {
-            // Potions do not deal blunt damage on hit; they shatter via handlePotionShatter
-            return;
-        } else if (isWeapon) {
-            // Thrown weapons: use a lighter version of weapon damage
+        let damage = 0;
+        if (isWeapon) {
             const die = projectile.weaponDamage || 4;
-            damage = Math.max(1, this.player.getClassicModifier(this.player.strength) + (Math.floor(Math.random()*die)+1));
-        } else if (projectile.type === 'potion') {
-            // Non-splash by default: minimal impact
-            damage = 1;
+            const roll = Math.floor(Math.random() * die) + 1;
+            damage = Math.max(1, this.player.getClassicModifier(this.player.strength) + roll);
         } else if (projectile.type === 'food') {
-            damage = 0; // Soft
+            damage = 0;
+        } else if (projectile.type === 'potion') {
+            damage = 0; // handled elsewhere
         } else {
-            // Generic item: weight-scaled blunt
-            const w = projectile.getTotalWeight ? projectile.getTotalWeight() : (projectile.weight || 1);
+            const w = (typeof projectile.getTotalWeight === 'function') ? projectile.getTotalWeight() : weight;
             damage = Math.max(0, Math.floor(w));
         }
         
-        if (damage > 0) {
-            if (this.renderer) this.renderer.addBattleLogMessage(`Thrown ${projectile.name} hits ${monster.name}!`, 'normal');
-            // Apply as normal damage (AP 0)
-            monster.takeDamage(damage, 0);
-            if (!monster.isAlive) {
-                this.handleMonsterDefeated(monster, 'thrown');
-            }
-        } else {
-            if (this.renderer) this.renderer.addBattleLogMessage(`Thrown ${projectile.name} bounces off ${monster.name}.`, 'defense');
+        // Critical on natural 20
+        if (naturalRoll === 20 && damage > 0) {
+            damage *= 2;
+            if (this.renderer) this.renderer.addBattleLogMessage(`Critical hit! ${damage} damage!`, 'victory');
+        } else if (damage > 0 && this.renderer) {
+            this.renderer.addBattleLogMessage(`Hit! ${damage} damage!`);
         }
+        
+        // Penetration: half of weapon AP when thrown; otherwise 0
+        const ap = (isWeapon && typeof projectile.penetration === 'number') ? Math.max(0, Math.floor(projectile.penetration / 2)) : 0;
+        const dealt = monster.takeDamage(damage, ap);
+        
+        if (!monster.isAlive) {
+            this.handleMonsterDefeated(monster, 'thrown');
+            return { hit: true, killed: true, damage: dealt };
+        }
+        
+        // Status effects from thrown weapons
+        if (isWeapon && typeof calculateStatusEffectChance === 'function' && monster.statusEffects && damage > 0) {
+            try {
+                const weaponType = projectile.weaponType || 'thrown';
+                const maxDamage = monster.maxHp;
+                const possibleEffects = ['bleeding', 'stunned', 'fractured', 'poisoned', 'confused', 'paralyzed'];
+                for (const effectType of possibleEffects) {
+                    const effect = calculateStatusEffectChance(weaponType, effectType, damage, maxDamage);
+                    if (effect) {
+                        monster.statusEffects.addEffect(effect.type, effect.duration, effect.severity, 'thrown weapon');
+                    }
+                }
+            } catch (e) {
+                console.warn('Thrown status effect application failed:', e);
+            }
+        }
+        
+        return { hit: true, killed: false, damage: dealt };
     }
 
     // Shatter potion at impact and apply splash effects (radius 1)

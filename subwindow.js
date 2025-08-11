@@ -625,7 +625,7 @@ class SubWindow {
         this.title.textContent = 'Remove equipment';
         this.content.innerHTML = '';
         this.input.style.display = 'flex';
-        this.textInput.placeholder = 'Enter number or Cancel';
+        this.textInput.placeholder = 'Enter letter (a-z) or Cancel';
         this.textInput.value = '';
         
         const equipped = player.getEquipmentSummary();
@@ -634,36 +634,35 @@ class SubWindow {
             this.content.innerHTML = '<div style="color: #808080; font-style: italic;">You are not wearing anything.</div>';
             this.input.style.display = 'none';
         } else {
-            equipped.forEach((item, index) => {
+            // Map equipped slots to letters (a-z)
+            const slots = Object.keys(player.equipment);
+            const equippedSlots = slots.filter(slot => player.equipment[slot]);
+            const letterToSlot = {};
+            equippedSlots.forEach((slot, idx) => {
+                const letter = String.fromCharCode(97 + idx);
+                letterToSlot[letter] = slot;
                 const itemDiv = document.createElement('div');
-                itemDiv.textContent = `${index + 1} - ${item}`;
+                itemDiv.textContent = `${letter} - ${equipped[idx]}`;
                 this.content.appendChild(itemDiv);
             });
+            // Store mapping on instance for callback usage
+            this._unequipLetterToSlot = letterToSlot;
         }
         
         this.callback = (choice) => {
-            if (choice && !isNaN(choice)) {
-                const index = parseInt(choice) - 1;
-                const slots = Object.keys(player.equipment);
-                const equippedSlots = slots.filter(slot => player.equipment[slot]);
-                
-                if (index >= 0 && index < equippedSlots.length) {
-                    const slot = equippedSlots[index];
-                    const success = player.unequipToInventory(slot);
-                    if (success && window.game) {
-                        // Process monster turns after equipment change
-                        window.game.processMonsterTurns();
-                        window.game.render();
-                        
-                        // Trigger autosave after equipment change
-                        if (window.game.autosaveEnabled) {
-                            window.game.saveGame();
-                        }
+            if (choice && choice.length === 1) {
+                const letter = choice.toLowerCase();
+                const slot = this._unequipLetterToSlot ? this._unequipLetterToSlot[letter] : null;
+                if (!slot) return false;
+                const success = player.unequipToInventory(slot);
+                if (success && window.game) {
+                    window.game.processMonsterTurns();
+                    window.game.render();
+                    if (window.game.autosaveEnabled) {
+                        window.game.saveGame();
                     }
-                    return true; // Close menu after attempting to unequip
-                } else {
-                    return false; // Keep menu open if invalid selection
                 }
+                return true;
             }
             return false; // Keep menu open if invalid input
         };
@@ -957,6 +956,7 @@ class SubWindow {
         this.textInput.value = '';
         
         const inventory = player.getInventorySummary();
+        const extraEntries = []; // equipped entries appended after inventory
         
         if (inventory.length === 0) {
             this.content.innerHTML = '<div style="color: #808080; font-style: italic;">Your pack is empty.</div>';
@@ -966,6 +966,24 @@ class SubWindow {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'item-line';
                 itemDiv.textContent = item;
+                this.content.appendChild(itemDiv);
+            });
+            // Append equipped weapon/shield as throw candidates
+            const startCode = 97 + inventory.length; // next letter
+            if (player.equipment && player.equipment.weapon) {
+                const letter = String.fromCharCode(startCode + extraEntries.length);
+                extraEntries.push({ letter, slot: 'weapon', item: player.equipment.weapon });
+            }
+            if (player.equipment && player.equipment.shield) {
+                const letter = String.fromCharCode(97 + inventory.length + extraEntries.length);
+                extraEntries.push({ letter, slot: 'shield', item: player.equipment.shield });
+            }
+            extraEntries.forEach(entry => {
+                const item = entry.item;
+                const displayName = item.getDisplayName ? item.getDisplayName() : item.name;
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'item-line';
+                itemDiv.textContent = `${entry.letter} - ${displayName} (equipped ${entry.slot})`;
                 this.content.appendChild(itemDiv);
             });
             
@@ -980,19 +998,29 @@ class SubWindow {
         this.callback = (choice) => {
             if (choice && choice.length === 1) {
                 const letter = choice.toLowerCase();
-                const item = player.getInventoryItem(letter);
-                if (!item) {
-                    if (window.game && window.game.renderer) {
-                        window.game.renderer.addBattleLogMessage('No such item.', 'normal');
+                // Check if this letter maps to an extra equipped entry
+                const extra = extraEntries.find(e => e.letter === letter);
+                if (extra) {
+                    this.close();
+                    if (window.game && typeof window.game.beginThrowDirectionSelection === 'function') {
+                        window.game.beginThrowDirectionSelection({ equipSlot: extra.slot });
                     }
-                    return false;
+                    return true;
+                } else {
+                    const item = player.getInventoryItem(letter);
+                    if (!item) {
+                        if (window.game && window.game.renderer) {
+                            window.game.renderer.addBattleLogMessage('No such item.', 'normal');
+                        }
+                        return false;
+                    }
+                    // Close and hand off to game for direction selection
+                    this.close();
+                    if (window.game && typeof window.game.beginThrowDirectionSelection === 'function') {
+                        window.game.beginThrowDirectionSelection(letter);
+                    }
+                    return true; // Close window
                 }
-                // Close and hand off to game for direction selection
-                this.close();
-                if (window.game && typeof window.game.beginThrowDirectionSelection === 'function') {
-                    window.game.beginThrowDirectionSelection(letter);
-                }
-                return true; // Close window
             }
             return false;
         };

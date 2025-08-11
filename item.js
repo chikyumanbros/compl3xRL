@@ -514,10 +514,14 @@ class EquipmentItem extends Item {
         
         // Usage type modifiers
         const usageModifiers = {
-            'normal': 1.0,     // Normal use
-            'critical': 2.0,   // Critical hits cause more wear
-            'block': 1.5,      // Blocking puts stress on equipment
-            'fumble': 3.0      // Fumbling damages equipment more
+            'normal': 1.0,       // Normal use
+            'critical': 2.0,     // Critical hits cause more wear
+            'block': 1.5,        // Blocking puts stress on equipment
+            'fumble': 3.0,       // Fumbling damages equipment more
+            // Thrown usage variants
+            'thrown_hit': 1.25,   // Impact on a target
+            'thrown_impact': 1.10, // Landing impact on the ground
+            'thrown_wall': 1.75   // Hard collision with wall/door
         };
         
         // Quality modifiers
