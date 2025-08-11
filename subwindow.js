@@ -947,6 +947,61 @@ class SubWindow {
     }
     
     /**
+     * Show throw selection menu (choose an item from inventory to throw)
+     */
+    showThrowSelectionMenu(player) {
+        this.title.textContent = 'Throw which item? (a-z, Escape to cancel)';
+        this.content.innerHTML = '';
+        this.input.style.display = 'flex';
+        this.textInput.placeholder = 'Enter letter (a-z)';
+        this.textInput.value = '';
+        
+        const inventory = player.getInventorySummary();
+        
+        if (inventory.length === 0) {
+            this.content.innerHTML = '<div style="color: #808080; font-style: italic;">Your pack is empty.</div>';
+            this.input.style.display = 'none';
+        } else {
+            inventory.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'item-line';
+                itemDiv.textContent = item;
+                this.content.appendChild(itemDiv);
+            });
+            
+            const helpDiv = document.createElement('div');
+            helpDiv.style.marginTop = '10px';
+            helpDiv.style.color = '#808080';
+            helpDiv.style.fontSize = '0.9em';
+            helpDiv.textContent = 'Throw one unit for stackable items';
+            this.content.appendChild(helpDiv);
+        }
+        
+        this.callback = (choice) => {
+            if (choice && choice.length === 1) {
+                const letter = choice.toLowerCase();
+                const item = player.getInventoryItem(letter);
+                if (!item) {
+                    if (window.game && window.game.renderer) {
+                        window.game.renderer.addBattleLogMessage('No such item.', 'normal');
+                    }
+                    return false;
+                }
+                // Close and hand off to game for direction selection
+                this.close();
+                if (window.game && typeof window.game.beginThrowDirectionSelection === 'function') {
+                    window.game.beginThrowDirectionSelection(letter);
+                }
+                return true; // Close window
+            }
+            return false;
+        };
+        
+        this.show();
+        this.textInput.focus();
+    }
+
+    /**
      * Pick up all items at the position
      */
     pickupAllItems(items, playerX, playerY) {

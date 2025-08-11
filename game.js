@@ -32,6 +32,9 @@ class Game {
         this.previouslyVisibleMonsters = new Set(); // Track monster IDs that were visible last turn
         this.autoStopEnabled = true; // Allow disabling the feature if needed
         
+        // Throwing state
+        this.awaitingThrowDirection = null; // { letter: 'a' }
+        
         this.setupGame();
     }
     
@@ -1124,10 +1127,261 @@ class Game {
         });
     }
     
+    // Map key to 8-direction vector
+    getDirectionFromKey(event) {
+        if (event.shiftKey) return null; // only lowercase movement keys
+        switch (event.code) {
+            case 'KeyK': return { dx: 0, dy: -1 };
+            case 'KeyJ': return { dx: 0, dy: 1 };
+            case 'KeyH': return { dx: -1, dy: 0 };
+            case 'KeyL': return { dx: 1, dy: 0 };
+            case 'KeyY': return { dx: -1, dy: -1 };
+            case 'KeyU': return { dx: 1, dy: -1 };
+            case 'KeyB': return { dx: -1, dy: 1 };
+            case 'KeyN': return { dx: 1, dy: 1 };
+        }
+        return null;
+    }
+    
+    beginThrowDirectionSelection(letter) {
+        this.awaitingThrowDirection = { letter };
+        if (this.renderer) this.renderer.addLogMessage('Throw in which direction?');
+    }
+    
+    finishThrowWithDirection(dx, dy) {
+        const state = this.awaitingThrowDirection;
+        this.awaitingThrowDirection = null;
+        if (!state || !this.player) return;
+        const item = this.player.getInventoryItem(state.letter);
+        if (!item) {
+            if (this.renderer) this.renderer.addLogMessage('No such item.', 'normal');
+            return;
+        }
+        
+        // Remove one unit (stack-aware)
+        const removed = this.player.removeFromInventoryByLetter(state.letter, 1);
+        if (!removed) {
+            if (this.renderer) this.renderer.addLogMessage('You cannot throw that.', 'normal');
+            return;
+        }
+        const projectile = removed;
+        
+        // Compute max range based on strength/dexterity and item weight
+        const strMod = this.player.getClassicModifier(this.player.strength);
+        const dexMod = this.player.getClassicModifier(this.player.dexterity);
+        const baseRange = 4 + Math.max(0, strMod) + Math.max(0, dexMod);
+        const singleWeight = (() => {
+            if (typeof projectile.getEffectiveWeight === 'function') return projectile.getEffectiveWeight();
+            if (typeof projectile.weight === 'number') return projectile.weight;
+            return 1;
+        })();
+        const weight = singleWeight; // throwing one unit
+        const weightPenalty = Math.max(0, Math.floor(weight));
+        const maxRange = Math.max(2, baseRange - weightPenalty);
+        
+        this.resolveThrow(projectile, dx, dy, maxRange);
+    }
+    
+    resolveThrow(projectile, dx, dy, maxRange) {
+        const startX = this.player.x;
+        const startY = this.player.y;
+        let x = startX;
+        let y = startY;
+        let lastFreeX = startX;
+        let lastFreeY = startY;
+        
+        for (let step = 1; step <= maxRange; step++) {
+            x += Math.sign(dx);
+            y += Math.sign(dy);
+            
+            if (!this.dungeon.isInBounds(x, y)) break;
+            const tile = this.dungeon.getTile(x, y);
+            // Check collision with walls/closed doors
+            if (tile.type === 'wall' || (tile.type === 'door' && tile.doorState !== 'open')) {
+                break;
+            }
+            
+            // Check hit monster
+            const target = this.monsterSpawner.getMonsterAt(x, y);
+            if (target) {
+                // If potion: shatter and apply splash, do not drop item
+                if (projectile.type === 'potion') {
+                    this.handlePotionShatter(projectile, x, y, target);
+                } else {
+                    this.applyThrownHit(projectile, target);
+                    // Non-potion items drop at the impact tile
+                    this.dropProjectileAt(projectile, x, y);
+                }
+                this.postPlayerAction();
+                return;
+            }
+            
+            // Tile is free, remember last
+            lastFreeX = x; lastFreeY = y;
+        }
+        
+        // No hit: if potion, shatter at landing; otherwise, drop on ground
+        if (projectile.type === 'potion') {
+            this.handlePotionShatter(projectile, lastFreeX, lastFreeY, null);
+        } else {
+            this.dropProjectileAt(projectile, lastFreeX, lastFreeY);
+            if (this.renderer) this.renderer.addLogMessage('You throw and it lands on the ground.');
+        }
+        this.postPlayerAction();
+    }
+    
+    applyThrownHit(projectile, monster) {
+        // Base damage by item kind
+        let damage = 0;
+        const isWeapon = projectile.type === 'weapon' || projectile.weaponDamage;
+        if (projectile.type === 'potion') {
+            // Potions do not deal blunt damage on hit; they shatter via handlePotionShatter
+            return;
+        } else if (isWeapon) {
+            // Thrown weapons: use a lighter version of weapon damage
+            const die = projectile.weaponDamage || 4;
+            damage = Math.max(1, this.player.getClassicModifier(this.player.strength) + (Math.floor(Math.random()*die)+1));
+        } else if (projectile.type === 'potion') {
+            // Non-splash by default: minimal impact
+            damage = 1;
+        } else if (projectile.type === 'food') {
+            damage = 0; // Soft
+        } else {
+            // Generic item: weight-scaled blunt
+            const w = projectile.getTotalWeight ? projectile.getTotalWeight() : (projectile.weight || 1);
+            damage = Math.max(0, Math.floor(w));
+        }
+        
+        if (damage > 0) {
+            if (this.renderer) this.renderer.addBattleLogMessage(`Thrown ${projectile.name} hits ${monster.name}!`, 'normal');
+            // Apply as normal damage (AP 0)
+            monster.takeDamage(damage, 0);
+            if (!monster.isAlive) {
+                this.handleMonsterDefeated(monster, 'thrown');
+            }
+        } else {
+            if (this.renderer) this.renderer.addBattleLogMessage(`Thrown ${projectile.name} bounces off ${monster.name}.`, 'defense');
+        }
+    }
+
+    // Shatter potion at impact and apply splash effects (radius 1)
+    handlePotionShatter(projectile, impactX, impactY, primaryTarget = null) {
+        if (this.renderer) this.renderer.addLogMessage('The bottle shatters!');
+        
+        // Determine primary effect amount
+        let primaryAmount = 0;
+        if (projectile.healDice) {
+            primaryAmount = rollDice(projectile.healDice);
+        } else if (projectile.healAmount) {
+            primaryAmount = projectile.healAmount;
+        }
+        const splashAmount = Math.floor(primaryAmount / 2);
+        
+        const affectEntity = (entity, amount) => {
+            if (!entity || amount <= 0) return;
+            // Heal effect for healing potions
+            if (entity === this.player) {
+                const healed = this.player.heal(amount);
+                if (healed > 0 && this.renderer) {
+                    this.renderer.addBattleLogMessage(`You are splashed by ${projectile.name}. (+${healed} HP)`, 'heal');
+                }
+            } else {
+                // Monster heal
+                if (typeof entity.heal === 'function') {
+                    const healed = entity.heal(amount);
+                    if (healed > 0 && this.renderer) {
+                        this.renderer.addBattleLogMessage(`${entity.name} is splashed by ${projectile.name}. (+${healed} HP)`, 'heal');
+                    }
+                }
+            }
+        };
+        
+        // Apply to primary target (full), otherwise to any entity on impact tile
+        if (primaryTarget) {
+            affectEntity(primaryTarget, primaryAmount);
+            // If a monster was healed to death prevention not needed; if in future damaging potions are added,
+            // unify defeat handling here as well.
+        } else {
+            // Check player on tile
+            if (this.player.x === impactX && this.player.y === impactY) {
+                affectEntity(this.player, primaryAmount);
+            }
+            const m = this.monsterSpawner.getMonsterAt(impactX, impactY);
+            if (m) affectEntity(m, primaryAmount);
+        }
+        
+        // Splash radius 1 around impact
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+                if (dx === 0 && dy === 0) continue;
+                const x = impactX + dx;
+                const y = impactY + dy;
+                if (!this.dungeon.isInBounds(x, y)) continue;
+                // If player in splash
+                if (this.player.x === x && this.player.y === y) {
+                    affectEntity(this.player, splashAmount);
+                }
+                const mon = this.monsterSpawner.getMonsterAt(x, y);
+                if (mon) affectEntity(mon, splashAmount);
+            }
+        }
+        // Potions are consumed; do not drop item
+    }
+    
+    // Unified defeat handler for player-caused monster deaths (e.g., thrown items)
+    handleMonsterDefeated(monster, cause = 'player') {
+        if (!monster || monster.isAlive) return;
+        // Prevent double EXP in any edge case
+        if (monster._xpGranted) return;
+        monster._xpGranted = true;
+        
+        // Victory log unified with melee style
+        if (this.renderer) {
+            const monsterName = monster.name || 'the monster';
+            this.renderer.addBattleLogMessage(`You defeat the ${monsterName}!`, 'victory');
+        }
+        
+        // Grant EXP if defined
+        if (this.player && typeof this.player.gainExp === 'function' && monster.expValue) {
+            this.player.gainExp(monster.expValue);
+        }
+    }
+    
+    dropProjectileAt(item, x, y) {
+        // Place item on ground (merge if possible is out of scope now)
+        item.x = x; item.y = y;
+        this.itemManager.addItem(item);
+    }
+    
+    postPlayerAction() {
+        // Noise from throwing similar to attack
+        if (this.noiseSystem) this.noiseSystem.makeSound(this.player.x, this.player.y, this.noiseSystem.getPlayerActionSound('ATTACK', this.player));
+        // Consume a turn and render
+        this.processTurn();
+        if (this.monsterSpawner && typeof this.monsterSpawner.removeDeadMonsters === 'function') {
+            this.monsterSpawner.removeDeadMonsters();
+        }
+        this.render();
+    }
+    
     /**
      * Handle keyboard input
      */
     handleKeyPress(event) {
+        // If awaiting throw direction, intercept direction keys
+        if (this.awaitingThrowDirection) {
+            const dir = this.getDirectionFromKey(event);
+            if (dir) {
+                event.preventDefault();
+                this.finishThrowWithDirection(dir.dx, dir.dy);
+                return;
+            }
+            if (event.code === 'Escape') {
+                this.awaitingThrowDirection = null;
+                if (this.renderer) this.renderer.addLogMessage('Throw cancelled.');
+                return;
+            }
+        }
         // Block input if sub-window is open
         if (window.subWindow && window.subWindow.isOpen) {
             return;
@@ -1299,10 +1553,16 @@ class Game {
                 }
                 break;
             case 'KeyT':
-                // Take off equipment - uppercase T (Shift+T)
                 if (event.shiftKey) {
+                    // Take off equipment - uppercase T (Shift+T)
                     event.preventDefault();
                     this.showUnequipMenu();
+                } else {
+                    // Throw item - lowercase t
+                    event.preventDefault();
+                    if (window.subWindow) {
+                        window.subWindow.showThrowSelectionMenu(this.player);
+                    }
                 }
                 break;
                 

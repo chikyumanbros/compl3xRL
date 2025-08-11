@@ -49,6 +49,19 @@ class Monster {
     }
     
     /**
+     * Heal the monster up to max HP
+     */
+    heal(amount) {
+        const integerAmount = Math.floor(amount);
+        const healed = Math.max(0, Math.min(integerAmount, this.maxHp - this.hp));
+        this.hp += healed;
+        if (window.game && window.game.renderer && healed > 0) {
+            window.game.renderer.addBattleLogMessage(`${this.name}: ${this.hp}/${this.maxHp} HP`, 'heal');
+        }
+        return healed;
+    }
+    
+    /**
      * Initialize monster stats by type (Classic Roguelike - Depth-based)
      */
     initializeByType(type) {
