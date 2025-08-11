@@ -152,9 +152,10 @@ class Game {
             }
             case 'gas': {
                 if (entity.statusEffects) {
-                    entity.statusEffects.addEffect('bleeding', 3 + Math.floor(Math.random() * 3), 1, 'trap');
+                    // Poison fits gas better than bleeding
+                    entity.statusEffects.addEffect('poisoned', 5 + Math.floor(Math.random() * 5), 1, 'trap');
                 }
-                if (this.renderer) this.renderer.addBattleLogMessage('A toxic gas irritates you! You start bleeding!', 'damage');
+                if (this.renderer) this.renderer.addBattleLogMessage('A poisonous gas surrounds you! You are poisoned!', 'damage');
                 break;
             }
             case 'pit': {
@@ -304,7 +305,7 @@ class Game {
                 const affectEntity = (target, amount) => {
                     if (!target) return;
                     if (target.statusEffects) {
-                        target.statusEffects.addEffect('bleeding', 2 + Math.floor(Math.random() * 3), 1, 'trap');
+                        target.statusEffects.addEffect('poisoned', 4 + Math.floor(Math.random() * 4), 1, 'trap');
                     }
                 };
                 for (let gy = y - 1; gy <= y + 1; gy++) {
@@ -315,7 +316,7 @@ class Game {
                         if (mon) affectEntity(mon);
                     }
                 }
-                if (this.renderer) this.renderer.addBattleLogMessage('A gas cloud bursts from the trap!', 'warning');
+                if (this.renderer) this.renderer.addBattleLogMessage('A poisonous gas cloud bursts from the trap!', 'warning');
                 break;
             }
             case 'pit': {
