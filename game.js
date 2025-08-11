@@ -75,6 +75,10 @@ class Game {
         const roll = Math.floor(Math.random() * 100) + 1;
         if (roll <= Math.max(5, base - tile.trap.difficulty)) {
             tile.trap.revealed = true;
+            if (this.renderer) {
+                const label = tile.trap && tile.trap.type ? `${tile.trap.type} trap` : 'trap';
+                this.renderer.addLogMessage(`You detect a ${label}.`);
+            }
             return true;
         }
         return false;
@@ -127,7 +131,10 @@ class Game {
         const trap = tile.trap;
         // Reveal on trigger
         trap.revealed = true;
-        if (this.renderer) this.renderer.addBattleLogMessage('A trap is triggered!', 'warning');
+        if (this.renderer) {
+            const label = trap && trap.type ? `${trap.type} trap` : 'trap';
+            this.renderer.addBattleLogMessage(`A ${label} is triggered!`, 'warning');
+        }
         // Apply effects
         switch (trap.type) {
             case 'dart': {
@@ -244,16 +251,23 @@ class Game {
         const base = 30 + dexMod * 5 + wisMod * 2 - Math.max(0, -strMod) * 2 + encPenalty;
         const target = tile.trap.difficulty + 20;
         const roll = Math.floor(Math.random() * 100) + 1;
-        if (this.renderer) this.renderer.addLogMessage('You attempt to disarm the trap...');
+        if (this.renderer) {
+            const label = tile.trap && tile.trap.type ? `${tile.trap.type} trap` : 'trap';
+            this.renderer.addLogMessage(`You attempt to disarm the ${label}...`);
+        }
         if (roll + base >= target) {
             tile.trap.disarmed = true;
-            if (this.renderer) this.renderer.addBattleLogMessage('You successfully disarm the trap.', 'victory');
+            if (this.renderer) {
+                const label = tile.trap && tile.trap.type ? `${tile.trap.type} trap` : 'trap';
+                this.renderer.addBattleLogMessage(`You successfully disarm the ${label}.`, 'victory');
+            }
         } else {
             if (Math.random() < 0.6) {
                 const isAdjacent = !(this.player.x === x && this.player.y === y);
                 this.triggerTrapOnDisarmFailure(x, y, this.player, isAdjacent);
             } else if (this.renderer) {
-                this.renderer.addBattleLogMessage('You fail to disarm it.', 'warning');
+                const label = tile.trap && tile.trap.type ? `${tile.trap.type} trap` : 'trap';
+                this.renderer.addBattleLogMessage(`You fail to disarm the ${label}.`, 'warning');
             }
         }
         this.processTurn();
@@ -277,12 +291,12 @@ class Game {
                 // Shoot a dart toward the disarmer (simple auto-hit)
                 const dmg = 1 + Math.floor(Math.random() * 4); // 1d4
                 entity.takeDirectDamage(dmg);
-                if (this.renderer) this.renderer.addBattleLogMessage(`A dart shoots from the trap and hits you for ${dmg} damage!`, 'damage');
+                if (this.renderer) this.renderer.addBattleLogMessage(`A dart shoots from the dart trap and hits you for ${dmg} damage!`, 'damage');
                 break;
             }
             case 'snare': {
                 // Foot-only: snapping harmlessly if not on the tile
-                if (this.renderer) this.renderer.addLogMessage('The snare snaps harmlessly.');
+                if (this.renderer) this.renderer.addLogMessage('The snare trap snaps harmlessly.');
                 break;
             }
             case 'gas': {
@@ -308,12 +322,12 @@ class Game {
                 // Adjacent: stumble damage only (no fall)
                 const dmg = 1 + Math.floor(Math.random() * 3); // 1d3
                 entity.takeDirectDamage(dmg);
-                if (this.renderer) this.renderer.addBattleLogMessage(`Loose ground crumbles! You take ${dmg} damage.`, 'damage');
+                if (this.renderer) this.renderer.addBattleLogMessage(`Loose ground near the pit trap crumbles! You take ${dmg} damage.`, 'damage');
                 break;
             }
             case 'alarm': {
                 if (this.noiseSystem) this.noiseSystem.makeSound(x, y, 'LOUD');
-                if (this.renderer) this.renderer.addLogMessage('An alarm rings loudly!', 'warning');
+                if (this.renderer) this.renderer.addLogMessage('An alarm trap rings loudly!', 'warning');
                 break;
             }
             default: {
