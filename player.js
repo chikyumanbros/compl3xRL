@@ -189,12 +189,15 @@ class Player {
         
         this.checkRegeneration();
 
-        // Trap detection on entering tile (chance to reveal)
+        // Trap detection on entering tile (chance to reveal) + slight nearby auto-detect
         if (window.game && window.game.dungeon) {
+            // Foot tile
             const tile = window.game.dungeon.getTile(this.x, this.y);
             if (tile && tile.trap && !tile.trap.disarmed && !tile.trap.revealed) {
                 window.game.playerDetectsTrapAt(this.x, this.y);
             }
+            // Also auto-detect nearby traps radius 1 with a penalty (harder than active search)
+            window.game.autoDetectNearbyTraps(1, -10);
         }
     }
     

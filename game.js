@@ -63,21 +63,61 @@ class Game {
         this.startAutosaveTimer();
     }
 
-    // Trap detection helper (DEX/WIS, level, vs trap.difficulty)
-    playerDetectsTrapAt(x, y) {
+    // Trap detection helper (DEX/WIS, level, vs trap.difficulty) with optional bonus/penalty
+    playerDetectsTrapAt(x, y, bonus = 0) {
         const tile = this.dungeon.getTile(x, y);
         if (!tile || tile.type !== 'floor' || !tile.trap) return false;
         if (tile.trap.disarmed) return false;
         if (tile.trap.revealed) return true;
         const dexMod = this.player.getClassicModifier(this.player.dexterity);
         const wisMod = this.player.getClassicModifier(this.player.wisdom);
-        const base = 10 + (dexMod + wisMod) * 2 + this.player.level; // modest scaling
+        const base = 10 + (dexMod + wisMod) * 2 + this.player.level + bonus; // modest scaling
         const roll = Math.floor(Math.random() * 100) + 1;
         if (roll <= Math.max(5, base - tile.trap.difficulty)) {
             tile.trap.revealed = true;
             return true;
         }
         return false;
+    }
+
+    // Auto-detect nearby traps within radius with detection penalty (harder than active search)
+    autoDetectNearbyTraps(radius = 1, bonus = -10) {
+        const px = this.player.x;
+        const py = this.player.y;
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                const tx = px + dx, ty = py + dy;
+                if (!this.dungeon.isInBounds(tx, ty)) continue;
+                const tile = this.dungeon.getTile(tx, ty);
+                if (!tile || tile.type !== 'floor' || !tile.trap || tile.trap.disarmed || tile.trap.revealed) continue;
+                this.playerDetectsTrapAt(tx, ty, bonus);
+            }
+        }
+    }
+
+    // Active search command: reveal traps within radius with a detection bonus; consumes a turn
+    searchAction(radius = 2, bonus = 15) {
+        let found = 0;
+        const px = this.player.x, py = this.player.y;
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                const tx = px + dx, ty = py + dy;
+                if (!this.dungeon.isInBounds(tx, ty)) continue;
+                if (this.playerDetectsTrapAt(tx, ty, bonus)) {
+                    found++;
+                }
+            }
+        }
+        if (this.renderer) {
+            this.renderer.addLogMessage('You search carefully.');
+            if (found > 0) {
+                this.renderer.addBattleLogMessage(found === 1 ? 'You find a trap.' : `You find ${found} traps.`, 'victory');
+            }
+        }
+        // Consume turn
+        this.processTurn();
+        this.render();
+        return true;
     }
 
     // Trigger trap effects
@@ -1832,6 +1872,15 @@ class Game {
                     if (window.mapView) {
                         window.mapView.toggle(this);
                     }
+                }
+                break;
+            case 'KeyS':
+                // Search - lowercase s (active trap detection)
+                if (!event.shiftKey) {
+                    event.preventDefault();
+                    this.searchAction(2, 15);
+                } else {
+                    // Save (Shift+S) remains below in system commands
                 }
                 break;
             case 'KeyW':
