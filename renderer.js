@@ -173,8 +173,21 @@ class Renderer {
                             color = visibility.visible ? 'wall' : 'wall_memory';
                             break;
                         case 'floor':
-                            char = this.symbols.floor;
-                            color = visibility.visible ? 'floor' : 'floor_memory';
+                            // Show trap marker if revealed and within FOV
+                            if (tile.trap && !tile.trap.disarmed && tile.trap.revealed && visibility.visible) {
+                                char = this.symbols.trap;
+                                const trapType = tile.trap.type;
+                                // Use type-specific color classes
+                                if (trapType === 'dart') color = 'trap_dart';
+                                else if (trapType === 'snare') color = 'trap_snare';
+                                else if (trapType === 'gas') color = 'trap_gas';
+                                else if (trapType === 'pit') color = 'trap_pit';
+                                else if (trapType === 'alarm') color = 'trap_alarm';
+                                else color = 'floor';
+                            } else {
+                                char = this.symbols.floor;
+                                color = visibility.visible ? 'floor' : 'floor_memory';
+                            }
                             break;
                                             case 'door':
                         // Display door based on its state

@@ -141,6 +141,8 @@ class Dungeon {
         this.addStairs();
         
 
+        // Add traps after terrain features
+        this.addTraps();
     }
     
     /**
@@ -853,6 +855,95 @@ class Dungeon {
             const downStairsX = downRoom.x + 1 + Math.floor(Math.random() * (downRoom.width - 2));
             const downStairsY = downRoom.y + 1 + Math.floor(Math.random() * (downRoom.height - 2));
             this.setTile(downStairsX, downStairsY, 'stairs_down');
+        }
+    }
+
+    /**
+     * Place traps across the dungeon (NetHack/Angband-inspired)
+     * Traps are stored on floor tiles as tile.trap = { type, hidden, revealed, disarmed, difficulty }
+     */
+    addTraps() {
+        // Determine approximate number of traps based on map size
+        const area = this.width * this.height;
+        const targetCount = Math.max(5, Math.floor(area * 0.005)); // ~0.5% of tiles, minimum 5
+
+        let placed = 0;
+        let attempts = 0;
+        const maxAttempts = targetCount * 50;
+
+        while (placed < targetCount && attempts < maxAttempts) {
+            attempts++;
+            const x = 1 + Math.floor(Math.random() * (this.width - 2));
+            const y = 1 + Math.floor(Math.random() * (this.height - 2));
+            const tile = this.getTile(x, y);
+
+            // Only place on floor, avoid stairs and doors
+            if (tile.type !== 'floor') continue;
+            if (this.isNearStairsOrDoor(x, y)) continue;
+            if (tile.trap) continue;
+
+            // Bias: Corridors, junctions, room entrances slightly more likely
+            const corridorBias = this.isCorridor(x, y) ? 1.5 : 1.0;
+            const junctionBias = this.isJunction(x, y) ? 1.5 : 1.0;
+            if (Math.random() > 0.35 * corridorBias * junctionBias) continue;
+
+            const trap = this.createRandomTrap();
+            tile.trap = trap;
+            placed++;
+        }
+    }
+
+    /** Check adjacency to stairs/doors to avoid unfair placements */
+    isNearStairsOrDoor(x, y) {
+        const dirs = [
+            {dx:0,dy:0},{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1},
+            {dx:1,dy:1},{dx:1,dy:-1},{dx:-1,dy:1},{dx:-1,dy:-1}
+        ];
+        for (const d of dirs) {
+            const nx = x + d.dx, ny = y + d.dy;
+            if (!this.isInBounds(nx, ny)) continue;
+            const t = this.getTile(nx, ny);
+            if (t.type === 'stairs_up' || t.type === 'stairs_down' || t.type === 'door') return true;
+        }
+        return false;
+    }
+
+    /** Is tile corridor-like (not inside a room) */
+    isCorridor(x, y) {
+        if (this.isInRoom(x, y)) return false;
+        return this.getTile(x, y).type === 'floor';
+    }
+
+    /** Detect simple junction (3+ cardinal walkables) */
+    isJunction(x, y) {
+        const dirs = [ {dx:0,dy:-1}, {dx:1,dy:0}, {dx:0,dy:1}, {dx:-1,dy:0} ];
+        let count = 0;
+        for (const d of dirs) {
+            const nx = x + d.dx, ny = y + d.dy;
+            if (!this.isInBounds(nx, ny)) continue;
+            const t = this.getTile(nx, ny);
+            if (t.type === 'floor' || (t.type === 'door' && t.doorState === 'open')) count++;
+        }
+        return count >= 3;
+    }
+
+    /**
+     * Create a random trap definition
+     */
+    createRandomTrap() {
+        const trapRoll = Math.random();
+        // Basic set inspired by classic roguelikes
+        // Each has a base difficulty (higher = harder to detect/disarm)
+        if (trapRoll < 0.30) {
+            return { type: 'dart', hidden: true, revealed: false, disarmed: false, difficulty: 30 };
+        } else if (trapRoll < 0.55) {
+            return { type: 'snare', hidden: true, revealed: false, disarmed: false, difficulty: 40 };
+        } else if (trapRoll < 0.75) {
+            return { type: 'gas', hidden: true, revealed: false, disarmed: false, difficulty: 45 };
+        } else if (trapRoll < 0.90) {
+            return { type: 'pit', hidden: true, revealed: false, disarmed: false, difficulty: 35 };
+        } else {
+            return { type: 'alarm', hidden: true, revealed: false, disarmed: false, difficulty: 25 };
         }
     }
     

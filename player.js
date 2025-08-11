@@ -188,6 +188,14 @@ class Player {
         // Nutrition is consumed per-turn in processHunger()
         
         this.checkRegeneration();
+
+        // Trap detection on entering tile (chance to reveal)
+        if (window.game && window.game.dungeon) {
+            const tile = window.game.dungeon.getTile(this.x, this.y);
+            if (tile && tile.trap && !tile.trap.disarmed && !tile.trap.revealed) {
+                window.game.playerDetectsTrapAt(this.x, this.y);
+            }
+        }
     }
     
     /**
@@ -262,6 +270,12 @@ class Player {
             // Generate movement sound (adjusted for encumbrance)
             if (window.game && window.game.noiseSystem) {
                 window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getPlayerActionSound('MOVE', this));
+            }
+
+            // After moving onto a tile, if there's a revealed, armed trap here, immediately trigger
+            const tile = dungeon.getTile(this.x, this.y);
+            if (tile && tile.trap && !tile.trap.disarmed && tile.trap.revealed) {
+                if (window.game) window.game.triggerTrapAt(this.x, this.y, this);
             }
             return true;
         }

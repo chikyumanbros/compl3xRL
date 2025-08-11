@@ -380,6 +380,12 @@ body {
 .item_multiple { color: #ffff00; } /* Yellow for multiple items */
 .item_memory { color: #006600; } /* Dimmed green for remembered items */
 .stairs { color: #ffff00; font-weight: bold; }
+/* Trap colors */
+.trap_dart { color: #ff6666; }   /* red-ish: direct damage */
+.trap_snare { color: #ffff66; }  /* yellow: control/stun */
+.trap_gas { color: #66ff66; }    /* green: gas/DoT */
+.trap_pit { color: #66ccff; }    /* cyan: fall/impact */
+.trap_alarm { color: #ff00ff; }  /* magenta: alarm */
 
 /* Memory/explored but not visible colors */
 .wall_memory { color: #404040; }

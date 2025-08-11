@@ -34,6 +34,8 @@ class Game {
         
         // Throwing state
         this.awaitingThrowDirection = null; // { letter: 'a' }
+        // Disarm state
+        this.awaitingDisarmDirection = null; // { candidates: Set<'x,y'> }
         
         this.setupGame();
     }
@@ -59,6 +61,132 @@ class Game {
         
         // Start autosave timer
         this.startAutosaveTimer();
+    }
+
+    // Trap detection helper (DEX/WIS, level, vs trap.difficulty)
+    playerDetectsTrapAt(x, y) {
+        const tile = this.dungeon.getTile(x, y);
+        if (!tile || tile.type !== 'floor' || !tile.trap) return false;
+        if (tile.trap.disarmed) return false;
+        if (tile.trap.revealed) return true;
+        const dexMod = this.player.getClassicModifier(this.player.dexterity);
+        const wisMod = this.player.getClassicModifier(this.player.wisdom);
+        const base = 10 + (dexMod + wisMod) * 2 + this.player.level; // modest scaling
+        const roll = Math.floor(Math.random() * 100) + 1;
+        if (roll <= Math.max(5, base - tile.trap.difficulty)) {
+            tile.trap.revealed = true;
+            return true;
+        }
+        return false;
+    }
+
+    // Trigger trap effects
+    triggerTrapAt(x, y, entity) {
+        const tile = this.dungeon.getTile(x, y);
+        if (!tile || tile.type !== 'floor' || !tile.trap || tile.trap.disarmed) return false;
+        const trap = tile.trap;
+        // Reveal on trigger
+        trap.revealed = true;
+        if (this.renderer) this.renderer.addBattleLogMessage('A trap is triggered!', 'warning');
+        // Apply effects
+        switch (trap.type) {
+            case 'dart': {
+                const dmg = 1 + Math.floor(Math.random() * 4); // 1d4
+                entity.takeDirectDamage(dmg);
+                if (this.renderer) this.renderer.addBattleLogMessage(`A dart hits you for ${dmg} damage!`, 'damage');
+                break;
+            }
+            case 'snare': {
+                if (entity.statusEffects) {
+                    entity.statusEffects.addEffect('stunned', 2 + Math.floor(Math.random() * 3), 1, 'trap');
+                }
+                if (this.renderer) this.renderer.addBattleLogMessage('You are snared and stunned!', 'damage');
+                break;
+            }
+            case 'gas': {
+                if (entity.statusEffects) {
+                    entity.statusEffects.addEffect('bleeding', 3 + Math.floor(Math.random() * 3), 1, 'trap');
+                }
+                if (this.renderer) this.renderer.addBattleLogMessage('A toxic gas irritates you! You start bleeding!', 'damage');
+                break;
+            }
+            case 'pit': {
+                const dmg = 2 + Math.floor(Math.random() * 6); // 2-7
+                entity.takeDirectDamage(dmg);
+                if (entity.statusEffects) {
+                    entity.statusEffects.addEffect('fractured', 4 + Math.floor(Math.random() * 4), 1, 'trap');
+                }
+                if (this.renderer) this.renderer.addBattleLogMessage(`You fall into a pit! ${dmg} damage and a fracture!`, 'damage');
+                break;
+            }
+            case 'alarm': {
+                if (this.noiseSystem) this.noiseSystem.makeSound(x, y, 'LOUD');
+                if (this.renderer) this.renderer.addLogMessage('An alarm rings loudly!', 'warning');
+                break;
+            }
+        }
+        return true;
+    }
+
+    // Disarm trap attempt (Shift+D)
+    attemptDisarmTrap() {
+        // Build list of disarmable traps in 8-neighborhood (including current tile)
+        const px = this.player.x;
+        const py = this.player.y;
+        const candidates = [];
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const tx = px + dx, ty = py + dy;
+                if (!this.dungeon.isInBounds(tx, ty)) continue;
+                const t = this.dungeon.getTile(tx, ty);
+                if (t && t.type === 'floor' && t.trap && !t.trap.disarmed) {
+                    // 解除は露見済みであること（NetHack/Angband系の安全性を意識）
+                    if (t.trap.revealed) {
+                        candidates.push({ x: tx, y: ty });
+                    }
+                }
+            }
+        }
+        if (candidates.length === 0) {
+            if (this.renderer) this.renderer.addLogMessage('There is no revealed trap adjacent.');
+            return false;
+        }
+        if (candidates.length === 1) {
+            return this.disarmTrapAt(candidates[0].x, candidates[0].y);
+        }
+        // Multiple candidates: prompt direction (use same vi-keys mapping)
+        this.awaitingDisarmDirection = new Set(candidates.map(c => `${c.x},${c.y}`));
+        if (this.renderer) this.renderer.addLogMessage('Disarm in which direction?');
+        return true;
+    }
+
+    // Execute disarm sequence at target tile
+    disarmTrapAt(x, y) {
+        const tile = this.dungeon.getTile(x, y);
+        if (!tile || tile.type !== 'floor' || !tile.trap || tile.trap.disarmed) return false;
+        tile.trap.revealed = true;
+        const dexMod = this.player.getClassicModifier(this.player.dexterity);
+        const wisMod = this.player.getClassicModifier(this.player.wisdom);
+        const strMod = this.player.getClassicModifier(this.player.strength);
+        const enc = this.player.getEncumbranceLevel();
+        const encPenalty = enc.level === 'UNENCUMBERED' ? 0 : enc.level === 'BURDENED' ? -5 : enc.level === 'STRESSED' ? -10 : enc.level === 'STRAINED' ? -15 : enc.level === 'OVERTAXED' ? -25 : -35;
+        const base = 30 + dexMod * 5 + wisMod * 2 - Math.max(0, -strMod) * 2 + encPenalty;
+        const target = tile.trap.difficulty + 20;
+        const roll = Math.floor(Math.random() * 100) + 1;
+        if (this.renderer) this.renderer.addLogMessage('You attempt to disarm the trap...');
+        if (roll + base >= target) {
+            tile.trap.disarmed = true;
+            if (this.renderer) this.renderer.addBattleLogMessage('You successfully disarm the trap.', 'victory');
+        } else {
+            if (Math.random() < 0.6) {
+                this.triggerTrapAt(x, y, this.player);
+            } else if (this.renderer) {
+                this.renderer.addBattleLogMessage('You fail to disarm it.', 'warning');
+            }
+        }
+        this.processTurn();
+        this.render();
+        return true;
     }
     
     /**
@@ -607,7 +735,7 @@ class Game {
         return {
             width: dungeon.width,
             height: dungeon.height,
-            tiles: dungeon.tiles, // This should be serializable
+            tiles: dungeon.tiles, // includes trap metadata if present
             rooms: dungeon.rooms
         };
     }
@@ -1483,6 +1611,31 @@ class Game {
                 return;
             }
         }
+        // If awaiting disarm direction, read one step direction and disarm there
+        if (this.awaitingDisarmDirection) {
+            const dir = this.getDirectionFromKey(event);
+            if (dir) {
+                event.preventDefault();
+                const tx = this.player.x + dir.dx;
+                const ty = this.player.y + dir.dy;
+                const key = `${tx},${ty}`;
+                if (this.awaitingDisarmDirection.has(key)) {
+                    this.awaitingDisarmDirection = null;
+                    this.disarmTrapAt(tx, ty);
+                    return;
+                } else {
+                    // Direction chosen but no trap there; cancel
+                    this.awaitingDisarmDirection = null;
+                    if (this.renderer) this.renderer.addLogMessage('No revealed trap in that direction.');
+                    return;
+                }
+            }
+            if (event.code === 'Escape') {
+                this.awaitingDisarmDirection = null;
+                if (this.renderer) this.renderer.addLogMessage('Disarm cancelled.');
+                return;
+            }
+        }
         // Block input if sub-window is open
         if (window.subWindow && window.subWindow.isOpen) {
             return;
@@ -1613,8 +1766,12 @@ class Game {
                 }
                 break;
             case 'KeyD':
-                // Drop item - lowercase d
-                if (!event.shiftKey) {
+                // Shift+D: Disarm trap at current tile
+                if (event.shiftKey) {
+                    event.preventDefault();
+                    this.attemptDisarmTrap();
+                } else {
+                    // Drop item - lowercase d
                     event.preventDefault();
                     this.dropItem();
                 }
@@ -1768,6 +1925,13 @@ class Game {
         if (moved) {
             // Check for stairs
             const tile = this.dungeon.getTile(this.player.x, this.player.y);
+            // Trap interaction: if hidden trap present, chance to notice; if revealed and armed, it triggers handled in player.tryMove
+            if (tile.trap && !tile.trap.disarmed) {
+                // Attempt auto-detect upon stepping on hidden trap
+                if (!tile.trap.revealed) {
+                    this.playerDetectsTrapAt(this.player.x, this.player.y);
+                }
+            }
             if (tile.type === 'stairs_down' || tile.type === 'stairs_up') {
                 this.describeStairs();
             }
