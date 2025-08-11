@@ -250,13 +250,77 @@ class Game {
             if (this.renderer) this.renderer.addBattleLogMessage('You successfully disarm the trap.', 'victory');
         } else {
             if (Math.random() < 0.6) {
-                this.triggerTrapAt(x, y, this.player);
+                const isAdjacent = !(this.player.x === x && this.player.y === y);
+                this.triggerTrapOnDisarmFailure(x, y, this.player, isAdjacent);
             } else if (this.renderer) {
                 this.renderer.addBattleLogMessage('You fail to disarm it.', 'warning');
             }
         }
         this.processTurn();
         this.render();
+        return true;
+    }
+
+    // Special handling when disarm from adjacent tiles fails
+    triggerTrapOnDisarmFailure(x, y, entity, isAdjacent) {
+        const tile = this.dungeon.getTile(x, y);
+        if (!tile || !tile.trap || tile.trap.disarmed) return false;
+        const trap = tile.trap;
+        trap.revealed = true;
+        // If disarming on the same tile, behave as normal
+        if (!isAdjacent) {
+            return this.triggerTrapAt(x, y, entity);
+        }
+        // Adjacent failure: apply type-specific logic
+        switch (trap.type) {
+            case 'dart': {
+                // Shoot a dart toward the disarmer (simple auto-hit)
+                const dmg = 1 + Math.floor(Math.random() * 4); // 1d4
+                entity.takeDirectDamage(dmg);
+                if (this.renderer) this.renderer.addBattleLogMessage(`A dart shoots from the trap and hits you for ${dmg} damage!`, 'damage');
+                break;
+            }
+            case 'snare': {
+                // Foot-only: snapping harmlessly if not on the tile
+                if (this.renderer) this.renderer.addLogMessage('The snare snaps harmlessly.');
+                break;
+            }
+            case 'gas': {
+                // Gas cloud around the trap (radius 1)
+                const affectEntity = (target, amount) => {
+                    if (!target) return;
+                    if (target.statusEffects) {
+                        target.statusEffects.addEffect('bleeding', 2 + Math.floor(Math.random() * 3), 1, 'trap');
+                    }
+                };
+                for (let gy = y - 1; gy <= y + 1; gy++) {
+                    for (let gx = x - 1; gx <= x + 1; gx++) {
+                        if (!this.dungeon.isInBounds(gx, gy)) continue;
+                        if (this.player.x === gx && this.player.y === gy) affectEntity(this.player);
+                        const mon = this.monsterSpawner.getMonsterAt(gx, gy);
+                        if (mon) affectEntity(mon);
+                    }
+                }
+                if (this.renderer) this.renderer.addBattleLogMessage('A gas cloud bursts from the trap!', 'warning');
+                break;
+            }
+            case 'pit': {
+                // Adjacent: stumble damage only (no fall)
+                const dmg = 1 + Math.floor(Math.random() * 3); // 1d3
+                entity.takeDirectDamage(dmg);
+                if (this.renderer) this.renderer.addBattleLogMessage(`Loose ground crumbles! You take ${dmg} damage.`, 'damage');
+                break;
+            }
+            case 'alarm': {
+                if (this.noiseSystem) this.noiseSystem.makeSound(x, y, 'LOUD');
+                if (this.renderer) this.renderer.addLogMessage('An alarm rings loudly!', 'warning');
+                break;
+            }
+            default: {
+                // Fallback to normal trigger
+                return this.triggerTrapAt(x, y, entity);
+            }
+        }
         return true;
     }
     
