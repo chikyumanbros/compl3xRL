@@ -272,10 +272,21 @@ class Player {
                 window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getPlayerActionSound('MOVE', this));
             }
 
-            // After moving onto a tile, if there's a revealed, armed trap here, immediately trigger
+            // After moving onto a tile with an armed trap, check trigger chance
             const tile = dungeon.getTile(this.x, this.y);
-            if (tile && tile.trap && !tile.trap.disarmed && tile.trap.revealed) {
-                if (window.game) window.game.triggerTrapAt(this.x, this.y, this);
+            if (tile && tile.trap && !tile.trap.disarmed) {
+                // If hidden, auto-reveal chance already processed elsewhere; trap can still trigger
+                const willTrigger = window.game && typeof window.game.computeTrapTriggerChance === 'function'
+                    ? Math.random() < window.game.computeTrapTriggerChance(tile.trap, this)
+                    : (tile.trap.revealed ? true : Math.random() < 0.5);
+                if (willTrigger) {
+                    if (window.game) window.game.triggerTrapAt(this.x, this.y, this);
+                } else if (!tile.trap.revealed) {
+                    // Sometimes stepping without triggering reveals the trap
+                    if (window.game && Math.random() < 0.2) {
+                        window.game.playerDetectsTrapAt(this.x, this.y);
+                    }
+                }
             }
             return true;
         }

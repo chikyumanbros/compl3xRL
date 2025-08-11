@@ -128,6 +128,37 @@ class Game {
         return true;
     }
 
+    // Compute probability [0,1] that a trap triggers when stepped on
+    computeTrapTriggerChance(trap, player) {
+        // Base chance scaled by trap difficulty and type
+        let base = 0.35 + (Math.min(100, Math.max(10, trap.difficulty)) - 30) / 200; // ~0.25..0.55
+        switch (trap.type) {
+            case 'pit': base += 0.10; break;      // heavy footfalls more likely
+            case 'snare': base += 0.05; break;    // slightly sensitive
+            case 'alarm': base -= 0.05; break;    // less sensitive
+            // dart/gas: leave base
+        }
+        // Encumbrance increases chance
+        const enc = player.getEncumbranceLevel();
+        const encAdd = {
+            'UNENCUMBERED': 0.00,
+            'BURDENED': 0.05,
+            'STRESSED': 0.10,
+            'STRAINED': 0.15,
+            'OVERTAXED': 0.25,
+            'OVERLOADED': 0.35
+        }[enc.level] || 0.0;
+        base += encAdd;
+
+        // Dexterity reduces chance; negative DEX mod increases chance
+        const dexMod = player.getClassicModifier(player.dexterity); // -3..+3
+        base -= dexMod * 0.03;
+
+        // Clamp
+        base = Math.max(0.05, Math.min(0.95, base));
+        return base;
+    }
+
     // Disarm trap attempt (Shift+D)
     attemptDisarmTrap() {
         // Build list of disarmable traps in 8-neighborhood (including current tile)
