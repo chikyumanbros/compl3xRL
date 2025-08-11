@@ -945,7 +945,9 @@ class Dungeon {
         } else if (trapRoll < 0.90) {
             return { type: 'pit', hidden: true, revealed: false, disarmed: false, difficulty: 35 };
         } else {
-            return { type: 'alarm', hidden: true, revealed: false, disarmed: false, difficulty: 25 };
+            // Rare soporific cloud trap
+            const sleepType = Math.random() < 0.5 ? 'alarm' : 'sleep';
+            return { type: sleepType, hidden: true, revealed: false, disarmed: false, difficulty: sleepType === 'sleep' ? 50 : 25 };
         }
     }
     

@@ -43,7 +43,8 @@ class StatusEffect {
             fractured: `Fractured (${this.severity * 20}% speed penalty)`,
             poisoned: `Poisoned (${this.severity} dmg/turn)`,
             confused: `Confused (random movement)`,
-            paralyzed: `Paralyzed (cannot act)`
+            paralyzed: `Paralyzed (cannot act)`,
+            sleep: `Asleep (cannot act)`
         };
         return descriptions[this.type] || this.type;
     }
@@ -229,6 +230,9 @@ class StatusEffectManager {
             case 'paralyzed':
                 // Prevents all actions
                 break;
+            case 'sleep':
+                // Prevents all actions until woken
+                break;
         }
         
         return result;
@@ -250,8 +254,8 @@ class StatusEffectManager {
             if (['bleeding', 'poisoned', 'fractured'].includes(type)) {
                 saveBonus += Math.floor((this.entity.constitution - 10) / 2);
             }
-            // Wisdom-based saves (stun, confusion)
-            else if (['stunned', 'confused'].includes(type)) {
+            // Wisdom-based saves (stun, confusion, sleep)
+            else if (['stunned', 'confused', 'sleep'].includes(type)) {
                 saveBonus += Math.floor((this.entity.wisdom - 10) / 2);
             }
             // Strength-based saves (paralysis)
@@ -283,6 +287,9 @@ class StatusEffectManager {
         if (this.hasEffect('paralyzed')) {
             modifier = 0; // Cannot move
         }
+        if (this.hasEffect('sleep')) {
+            modifier = 0; // Cannot move
+        }
         
         if (this.hasEffect('stunned')) {
             modifier *= 0.5; // Half speed when stunned
@@ -308,6 +315,9 @@ class StatusEffectManager {
         if (this.hasEffect('paralyzed')) {
             modifier = 0; // Cannot act
         }
+        if (this.hasEffect('sleep')) {
+            modifier = 0; // Cannot act
+        }
         
         return modifier;
     }
@@ -323,7 +333,7 @@ class StatusEffectManager {
      * Check if entity can act this turn
      */
     canAct() {
-        return !this.hasEffect('paralyzed') && 
+        return !this.hasEffect('paralyzed') && !this.hasEffect('sleep') && 
                (Math.random() < this.getActionModifier());
     }
     
@@ -360,7 +370,8 @@ class StatusEffectManager {
             fractured: `${target} suffering from a ${severityText} fracture!`,
             poisoned: `${target} ${severityText} poisoned!`,
             confused: `${target} confused!`,
-            paralyzed: `${target} paralyzed!`
+            paralyzed: `${target} paralyzed!`,
+            sleep: `${target} falls asleep!`
         };
         
         window.game.renderer.addLogMessage(messages[type] || `${target} affected by ${type}!`);
@@ -380,7 +391,8 @@ class StatusEffectManager {
             fractured: `${target}'s fracture has healed.`,
             poisoned: `${target} recovered from poison.`,
             confused: `${target} regained clarity.`,
-            paralyzed: `${target} can move again.`
+            paralyzed: `${target} can move again.`,
+            sleep: `${target} wakes up.`
         };
         
         window.game.renderer.addLogMessage(messages[type] || `${target} recovered from ${type}.`);

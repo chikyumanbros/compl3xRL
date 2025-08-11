@@ -582,6 +582,10 @@ class Player {
         
         const oldHpPercent = this.hp / this.maxHp;
         this.hp -= finalDamage;
+        // Wake from magical sleep on damage
+        if (this.statusEffects && this.statusEffects.hasEffect && this.statusEffects.hasEffect('sleep')) {
+            this.statusEffects.removeEffect('sleep');
+        }
         const newHpPercent = this.hp / this.maxHp;
         
         // Check armor durability if damage was taken (not blocked)

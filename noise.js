@@ -67,6 +67,14 @@ class NoiseSystem {
         // Check each monster for noise awakening
         affectedMonsters.forEach(monster => {
             this.checkNoiseAwakening(monster, x, y, soundLevel);
+            // Sleeping status effect also reacts to sound: small wake chance
+            if (monster.statusEffects && monster.statusEffects.hasEffect && monster.statusEffects.hasEffect('sleep')) {
+                const extra = 0.05 * (soundLevel - 1); // +0%,+5%,+10%,+15%,+20%
+                if (Math.random() < Math.max(0, extra)) {
+                    monster.statusEffects.removeEffect('sleep');
+                    if (this.game.renderer) this.game.renderer.addLogMessage(`The ${monster.name} wakes up due to noise.`);
+                }
+            }
         });
     }
     

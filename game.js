@@ -179,6 +179,13 @@ class Game {
                 if (this.renderer) this.renderer.addLogMessage('An alarm rings loudly!', 'warning');
                 break;
             }
+            case 'sleep': {
+                if (entity.statusEffects) {
+                    entity.statusEffects.addEffect('sleep', 3 + Math.floor(Math.random() * 4), 1, 'trap');
+                }
+                if (this.renderer) this.renderer.addBattleLogMessage('A soporific mist makes you drowsy!', 'warning');
+                break;
+            }
         }
         return true;
     }

@@ -184,6 +184,7 @@ class Renderer {
                                 else if (trapType === 'gas_confuse') color = 'trap_gas_confuse';
                                 else if (trapType === 'pit') color = 'trap_pit';
                                 else if (trapType === 'alarm') color = 'trap_alarm';
+                                else if (trapType === 'sleep') color = 'trap_sleep';
                                 else color = 'floor';
                             } else {
                                 char = this.symbols.floor;

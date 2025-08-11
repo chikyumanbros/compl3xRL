@@ -1334,6 +1334,10 @@ class Monster {
         }
         
         this.hp -= finalDamage;
+        // Also cancel magical sleep status if present
+        if (this.statusEffects && this.statusEffects.hasEffect && this.statusEffects.hasEffect('sleep')) {
+            this.statusEffects.removeEffect('sleep');
+        }
         
         // Add HP status to battle log (only if damage was actually taken)
         if (window.game && window.game.renderer) {
