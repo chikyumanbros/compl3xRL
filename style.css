@@ -383,7 +383,8 @@ body {
 /* Trap colors */
 .trap_dart { color: #ff6666; }   /* red-ish: direct damage */
 .trap_snare { color: #ffff66; }  /* yellow: control/stun */
-.trap_gas { color: #66ff66; }    /* green: gas/DoT */
+.trap_gas_poison { color: #66ff66; }    /* green: poison gas */
+.trap_gas_confuse { color: #ffcc66; }   /* amber: confusion gas */
 .trap_pit { color: #66ccff; }    /* cyan: fall/impact */
 .trap_alarm { color: #ff00ff; }  /* magenta: alarm */
 

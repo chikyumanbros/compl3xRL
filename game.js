@@ -150,12 +150,19 @@ class Game {
                 if (this.renderer) this.renderer.addBattleLogMessage('You are snared and stunned!', 'damage');
                 break;
             }
-            case 'gas': {
+            case 'gas_poison': {
                 if (entity.statusEffects) {
                     // Poison fits gas better than bleeding
                     entity.statusEffects.addEffect('poisoned', 5 + Math.floor(Math.random() * 5), 1, 'trap');
                 }
                 if (this.renderer) this.renderer.addBattleLogMessage('A poisonous gas surrounds you! You are poisoned!', 'damage');
+                break;
+            }
+            case 'gas_confuse': {
+                if (entity.statusEffects) {
+                    entity.statusEffects.addEffect('confused', 3 + Math.floor(Math.random() * 4), 1, 'trap');
+                }
+                if (this.renderer) this.renderer.addBattleLogMessage('A dizzying gas surrounds you! You feel confused!', 'warning');
                 break;
             }
             case 'pit': {
@@ -300,7 +307,7 @@ class Game {
                 if (this.renderer) this.renderer.addLogMessage('The snare trap snaps harmlessly.');
                 break;
             }
-            case 'gas': {
+            case 'gas_poison': {
                 // Gas cloud around the trap (radius 1)
                 const affectEntity = (target, amount) => {
                     if (!target) return;
@@ -317,6 +324,25 @@ class Game {
                     }
                 }
                 if (this.renderer) this.renderer.addBattleLogMessage('A poisonous gas cloud bursts from the trap!', 'warning');
+                break;
+            }
+            case 'gas_confuse': {
+                // Confusion gas cloud around the trap (radius 1)
+                const affectEntity = (target) => {
+                    if (!target) return;
+                    if (target.statusEffects) {
+                        target.statusEffects.addEffect('confused', 2 + Math.floor(Math.random() * 3), 1, 'trap');
+                    }
+                };
+                for (let gy = y - 1; gy <= y + 1; gy++) {
+                    for (let gx = x - 1; gx <= x + 1; gx++) {
+                        if (!this.dungeon.isInBounds(gx, gy)) continue;
+                        if (this.player.x === gx && this.player.y === gy) affectEntity(this.player);
+                        const mon = this.monsterSpawner.getMonsterAt(gx, gy);
+                        if (mon) affectEntity(mon);
+                    }
+                }
+                if (this.renderer) this.renderer.addBattleLogMessage('A dizzying gas cloud bursts from the trap!', 'warning');
                 break;
             }
             case 'pit': {

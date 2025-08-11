@@ -939,7 +939,9 @@ class Dungeon {
         } else if (trapRoll < 0.55) {
             return { type: 'snare', hidden: true, revealed: false, disarmed: false, difficulty: 40 };
         } else if (trapRoll < 0.75) {
-            return { type: 'gas', hidden: true, revealed: false, disarmed: false, difficulty: 45 };
+            // Gas trap variants
+            const gasType = Math.random() < 0.6 ? 'gas_poison' : 'gas_confuse';
+            return { type: gasType, hidden: true, revealed: false, disarmed: false, difficulty: 45 };
         } else if (trapRoll < 0.90) {
             return { type: 'pit', hidden: true, revealed: false, disarmed: false, difficulty: 35 };
         } else {

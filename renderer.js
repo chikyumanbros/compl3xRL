@@ -180,7 +180,8 @@ class Renderer {
                                 // Use type-specific color classes
                                 if (trapType === 'dart') color = 'trap_dart';
                                 else if (trapType === 'snare') color = 'trap_snare';
-                                else if (trapType === 'gas') color = 'trap_gas';
+                                else if (trapType === 'gas_poison') color = 'trap_gas_poison';
+                                else if (trapType === 'gas_confuse') color = 'trap_gas_confuse';
                                 else if (trapType === 'pit') color = 'trap_pit';
                                 else if (trapType === 'alarm') color = 'trap_alarm';
                                 else color = 'floor';
