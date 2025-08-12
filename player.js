@@ -389,10 +389,10 @@ class Player {
                     monster.takeDamage(finalDamage, doorPenetration);
                     
                     if (!monster.isAlive) {
-                        if (window.game && window.game.renderer) {
-                            window.game.renderer.addBattleLogMessage(`You defeat the ${monster.name}!`, 'victory');
+                        if (window.game) {
+                            // Unified defeat handling (also drops corpse)
+                            window.game.handleMonsterDefeated(monster, 'door');
                         }
-                        this.gainExp(monster.expValue);
                     }
                     
                     // Generate door slam sound (very loud)
@@ -738,12 +738,8 @@ class Player {
             
             if (!monster.isAlive) {
                 try {
-                if (window.game && window.game.renderer) {
-                        const monsterName = monster.name || 'the monster';
-                        window.game.renderer.addBattleLogMessage(`You defeat ${monsterName}!`, 'victory');
-                }
-                    if (monster.expValue) {
-                this.gainExp(monster.expValue);
+                    if (window.game) {
+                        window.game.handleMonsterDefeated(monster, 'melee');
                     }
                 } catch (error) {
                     console.error('Error in monster defeat handling:', error);

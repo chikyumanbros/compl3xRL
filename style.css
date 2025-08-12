@@ -388,6 +388,7 @@ body {
 .trap_sleep { color: #66aaff; }         /* blue: sleep */
 .trap_pit { color: #66ccff; }    /* cyan: fall/impact */
 .trap_alarm { color: #ff00ff; }  /* magenta: alarm */
+.corpse { color: #996633; }
 
 /* Memory/explored but not visible colors */
 .wall_memory { color: #404040; }

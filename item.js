@@ -1906,6 +1906,28 @@ class ItemManager {
         this.dungeon = dungeon;
         this.items = [];
     }
+
+    /**
+     * Create a non-interactive corpse item from a monster and add to ground
+     */
+    addCorpse(monster) {
+        if (!monster || typeof monster.x !== 'number' || typeof monster.y !== 'number') return null;
+        const name = monster.name ? `${monster.name} corpse` : 'monster corpse';
+        const weight = Math.max(3, Math.floor((monster.maxHp || 6) / 2));
+        const corpse = new Item('corpse', name, {
+            description: `The remains of ${monster.name || 'a creature'}.`,
+            x: monster.x,
+            y: monster.y,
+            symbol: ';',
+            color: 'corpse',
+            stackable: false,
+            quantity: 1,
+            maxStackSize: 1,
+            weight
+        });
+        this.addItem(corpse);
+        return corpse;
+    }
     
     /**
      * Create a food item by type

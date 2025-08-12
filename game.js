@@ -1875,6 +1875,11 @@ class Game {
         if (this.player && typeof this.player.gainExp === 'function' && monster.expValue) {
             this.player.gainExp(monster.expValue);
         }
+
+        // Leave a non-interactive corpse on the ground (for future extensions)
+        if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
+            this.itemManager.addCorpse(monster);
+        }
     }
     
     dropProjectileAt(item, x, y) {
@@ -2517,6 +2522,10 @@ class Game {
                         this.renderer.addLogMessage(`The ${monster.name} dies from its wounds!`, 'victory');
                     }
                     this.player.gainExp(monster.expValue);
+                    // Drop corpse for DoT deaths
+                    if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
+                        this.itemManager.addCorpse(monster);
+                    }
                     return;
                 }
             }

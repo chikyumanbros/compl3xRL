@@ -76,6 +76,7 @@ class Renderer {
             scroll: '?',
             weapon: ')',
             armor: '[',
+            corpse: ';',
             
             // Special
             stairs_down: '>',
@@ -91,6 +92,7 @@ class Renderer {
             player: 'player',
             monster: 'monster',
             item: 'item',
+            corpse: 'corpse',
             stairs: 'stairs'
         };
         
