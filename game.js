@@ -63,6 +63,11 @@ class Game {
         this.startAutosaveTimer();
     }
 
+    // Helper: is tile currently visible to the player?
+    isTileVisible(x, y) {
+        return this.fov ? this.fov.isVisible(x, y) : false;
+    }
+
     // Trap detection helper (DEX/WIS, level, vs trap.difficulty) with optional bonus/penalty
     playerDetectsTrapAt(x, y, bonus = 0) {
         const tile = this.dungeon.getTile(x, y);
@@ -131,7 +136,9 @@ class Game {
         const trap = tile.trap;
         // Reveal on trigger
         trap.revealed = true;
-        if (this.renderer) {
+        const isPlayer = (entity === this.player);
+        const targetName = isPlayer ? 'you' : `the ${entity.name}`;
+        if (this.renderer && (isPlayer || this.isTileVisible(x, y))) {
             const label = trap && trap.type ? `${trap.type} trap` : 'trap';
             this.renderer.addBattleLogMessage(`A ${label} is triggered!`, 'warning');
         }
@@ -140,29 +147,52 @@ class Game {
             case 'dart': {
                 const dmg = 1 + Math.floor(Math.random() * 4); // 1d4
                 entity.takeDirectDamage(dmg);
-                if (this.renderer) this.renderer.addBattleLogMessage(`A dart hits you for ${dmg} damage!`, 'damage');
+                if (this.renderer && (isPlayer || this.isTileVisible(x, y))) this.renderer.addBattleLogMessage(`A dart hits ${targetName} for ${dmg} damage!`, 'damage');
                 break;
             }
             case 'snare': {
                 if (entity.statusEffects) {
                     entity.statusEffects.addEffect('stunned', 2 + Math.floor(Math.random() * 3), 1, 'trap');
                 }
-                if (this.renderer) this.renderer.addBattleLogMessage('You are snared and stunned!', 'damage');
+                if (this.renderer && (isPlayer || this.isTileVisible(x, y))) this.renderer.addBattleLogMessage(`${isPlayer ? 'You are' : `The ${entity.name} is`} snared and stunned!`, 'damage');
                 break;
             }
             case 'gas_poison': {
-                if (entity.statusEffects) {
-                    // Poison fits gas better than bleeding
-                    entity.statusEffects.addEffect('poisoned', 5 + Math.floor(Math.random() * 5), 1, 'trap');
+                // Gas cloud around the trap (radius 1) affects both player and monsters
+                const affectEntity = (target) => {
+                    if (!target) return;
+                    if (target.statusEffects) {
+                        target.statusEffects.addEffect('poisoned', 5 + Math.floor(Math.random() * 5), 1, 'trap');
+                    }
+                };
+                for (let gy = y - 1; gy <= y + 1; gy++) {
+                    for (let gx = x - 1; gx <= x + 1; gx++) {
+                        if (!this.dungeon.isInBounds(gx, gy)) continue;
+                        if (this.player.x === gx && this.player.y === gy) affectEntity(this.player);
+                        const mon = this.monsterSpawner.getMonsterAt(gx, gy);
+                        if (mon) affectEntity(mon);
+                    }
                 }
-                if (this.renderer) this.renderer.addBattleLogMessage('A poisonous gas surrounds you! You are poisoned!', 'damage');
+                if (this.renderer && (isPlayer || this.isTileVisible(x, y))) this.renderer.addBattleLogMessage('A poisonous gas cloud bursts from the trap!', 'warning');
                 break;
             }
             case 'gas_confuse': {
-                if (entity.statusEffects) {
-                    entity.statusEffects.addEffect('confused', 3 + Math.floor(Math.random() * 4), 1, 'trap');
+                // Confusion gas cloud around the trap (radius 1) affects both player and monsters
+                const affectEntity = (target) => {
+                    if (!target) return;
+                    if (target.statusEffects) {
+                        target.statusEffects.addEffect('confused', 3 + Math.floor(Math.random() * 4), 1, 'trap');
+                    }
+                };
+                for (let gy = y - 1; gy <= y + 1; gy++) {
+                    for (let gx = x - 1; gx <= x + 1; gx++) {
+                        if (!this.dungeon.isInBounds(gx, gy)) continue;
+                        if (this.player.x === gx && this.player.y === gy) affectEntity(this.player);
+                        const mon = this.monsterSpawner.getMonsterAt(gx, gy);
+                        if (mon) affectEntity(mon);
+                    }
                 }
-                if (this.renderer) this.renderer.addBattleLogMessage('A dizzying gas surrounds you! You feel confused!', 'warning');
+                if (this.renderer && (isPlayer || this.isTileVisible(x, y))) this.renderer.addBattleLogMessage('A dizzying gas cloud bursts from the trap!', 'warning');
                 break;
             }
             case 'pit': {
@@ -171,23 +201,111 @@ class Game {
                 if (entity.statusEffects) {
                     entity.statusEffects.addEffect('fractured', 4 + Math.floor(Math.random() * 4), 1, 'trap');
                 }
-                if (this.renderer) this.renderer.addBattleLogMessage(`You fall into a pit! ${dmg} damage and a fracture!`, 'damage');
+                if (this.renderer && (isPlayer || this.isTileVisible(x, y))) this.renderer.addBattleLogMessage(`${isPlayer ? 'You fall' : `The ${entity.name} falls`} into a pit! ${dmg} damage and a fracture!`, 'damage');
                 break;
             }
             case 'alarm': {
                 if (this.noiseSystem) this.noiseSystem.makeSound(x, y, 'LOUD');
-                if (this.renderer) this.renderer.addLogMessage('An alarm rings loudly!', 'warning');
+                if (this.renderer && (isPlayer || this.isTileVisible(x, y))) this.renderer.addLogMessage('An alarm rings loudly!', 'warning');
                 break;
             }
             case 'sleep': {
                 if (entity.statusEffects) {
                     entity.statusEffects.addEffect('sleep', 3 + Math.floor(Math.random() * 4), 1, 'trap');
                 }
-                if (this.renderer) this.renderer.addBattleLogMessage('A soporific mist makes you drowsy!', 'warning');
+                if (this.renderer && (isPlayer || this.isTileVisible(x, y))) this.renderer.addBattleLogMessage(`A soporific mist makes ${targetName} drowsy!`, 'warning');
                 break;
             }
         }
         return true;
+    }
+
+    // Compute probability [0,1] that a trap triggers when a MONSTER steps on it
+    computeTrapTriggerChanceForMonster(trap, monster) {
+        // Base chance scaled by trap difficulty and type
+        let base = 0.35 + (Math.min(100, Math.max(10, trap.difficulty)) - 30) / 200; // ~0.25..0.55
+        switch (trap.type) {
+            case 'pit': base += 0.10; break;
+            case 'snare': base += 0.05; break;
+            case 'alarm': base -= 0.05; break;
+            default: break;
+        }
+
+        // Speed adjustment: faster monsters are less likely to trigger pressure/snap traps
+        if (typeof monster.speed === 'number') {
+            let speedAdj = (100 - monster.speed) / 400; // -0.25..+0.25 typical
+            speedAdj = Math.max(-0.15, Math.min(0.15, speedAdj));
+            base += speedAdj;
+        }
+
+        // Strength/mass proxy: stronger/heavier monsters are more likely to trigger
+        if (typeof monster.strength === 'number') {
+            let strAdj = (monster.strength - 10) * 0.01; // +/- 0.1 around STR 10
+            // Pit traps are more sensitive to weight
+            if (trap.type === 'pit') strAdj *= 1.5;
+            strAdj = Math.max(-0.15, Math.min(0.15, strAdj));
+            base += strAdj;
+        }
+
+        // Intelligence awareness: smarter monsters avoid traps slightly more
+        const intelAdjMap = {
+            mindless: 0.10,
+            animal: 0.05,
+            normal: 0.0,
+            smart: -0.05,
+            genius: -0.10
+        };
+        if (monster.intelligence && intelAdjMap.hasOwnProperty(monster.intelligence)) {
+            base += intelAdjMap[monster.intelligence];
+        }
+
+        // Species/type-based adjustments
+        const type = (monster.type || '').toLowerCase();
+        const flyers = new Set(['bat', 'hawk', 'eagle', 'wyvern']);
+        const smallLight = new Set(['rat', 'gecko', 'newt']);
+        const heavyBeasts = new Set(['bear', 'troll', 'giant', 'ogre']);
+        const hovering = new Set(['floating_eye']);
+        const arthropods = new Set(['spider', 'centipede']);
+
+        if (flyers.has(type)) {
+            base -= 0.10; // general agility over traps
+            if (trap.type === 'pit') base -= 0.15; // flying mostly avoids pits
+        }
+        if (hovering.has(type)) {
+            base -= 0.10;
+            if (trap.type === 'pit') base -= 0.15; // floats over
+        }
+        if (smallLight.has(type)) {
+            base -= 0.05; // light weight
+        }
+        if (heavyBeasts.has(type)) {
+            base += 0.10;
+            if (trap.type === 'pit') base += 0.10; // heavy falls more easily
+        }
+        if (arthropods.has(type)) {
+            if (trap.type === 'snare') base += 0.05; // more legs to snag
+            if (trap.type === 'pit') base -= 0.03; // lighter distribution
+        }
+
+        // Current condition modifiers
+        if (monster.statusEffects) {
+            const sev = (t) => (monster.statusEffects.getEffectSeverity ? monster.statusEffects.getEffectSeverity(t) : 0) || 0;
+            const stunned = sev('stunned');
+            const fractured = sev('fractured');
+            const confused = monster.statusEffects.hasEffect && monster.statusEffects.hasEffect('confused');
+            if (stunned > 0) base += 0.05 * stunned; // up to +0.15
+            if (fractured > 0) base += 0.03 * fractured; // up to +0.09
+            if (confused) base += 0.08; // inattentive movement
+            // Just woke up from sleep → groggy
+            if (monster.justWokeUp) base += 0.10;
+        }
+
+        // Fleeing monsters are careless
+        if (monster.isFleeing) base += 0.05;
+
+        // Clamp
+        base = Math.max(0.05, Math.min(0.95, base));
+        return base;
     }
 
     // Compute probability [0,1] that a trap triggers when stepped on
@@ -306,12 +424,12 @@ class Game {
                 // Shoot a dart toward the disarmer (simple auto-hit)
                 const dmg = 1 + Math.floor(Math.random() * 4); // 1d4
                 entity.takeDirectDamage(dmg);
-                if (this.renderer) this.renderer.addBattleLogMessage(`A dart shoots from the dart trap and hits you for ${dmg} damage!`, 'damage');
+                if (this.renderer && this.isTileVisible(x, y)) this.renderer.addBattleLogMessage(`A dart shoots from the dart trap and hits you for ${dmg} damage!`, 'damage');
                 break;
             }
             case 'snare': {
                 // Foot-only: snapping harmlessly if not on the tile
-                if (this.renderer) this.renderer.addLogMessage('The snare trap snaps harmlessly.');
+                if (this.renderer && this.isTileVisible(x, y)) this.renderer.addLogMessage('The snare trap snaps harmlessly.');
                 break;
             }
             case 'gas_poison': {
@@ -330,7 +448,7 @@ class Game {
                         if (mon) affectEntity(mon);
                     }
                 }
-                if (this.renderer) this.renderer.addBattleLogMessage('A poisonous gas cloud bursts from the trap!', 'warning');
+                if (this.renderer && this.isTileVisible(x, y)) this.renderer.addBattleLogMessage('A poisonous gas cloud bursts from the trap!', 'warning');
                 break;
             }
             case 'gas_confuse': {
@@ -349,19 +467,19 @@ class Game {
                         if (mon) affectEntity(mon);
                     }
                 }
-                if (this.renderer) this.renderer.addBattleLogMessage('A dizzying gas cloud bursts from the trap!', 'warning');
+                if (this.renderer && this.isTileVisible(x, y)) this.renderer.addBattleLogMessage('A dizzying gas cloud bursts from the trap!', 'warning');
                 break;
             }
             case 'pit': {
                 // Adjacent: stumble damage only (no fall)
                 const dmg = 1 + Math.floor(Math.random() * 3); // 1d3
                 entity.takeDirectDamage(dmg);
-                if (this.renderer) this.renderer.addBattleLogMessage(`Loose ground near the pit trap crumbles! You take ${dmg} damage.`, 'damage');
+                if (this.renderer && this.isTileVisible(x, y)) this.renderer.addBattleLogMessage(`Loose ground near the pit trap crumbles! You take ${dmg} damage.`, 'damage');
                 break;
             }
             case 'alarm': {
                 if (this.noiseSystem) this.noiseSystem.makeSound(x, y, 'LOUD');
-                if (this.renderer) this.renderer.addLogMessage('An alarm trap rings loudly!', 'warning');
+                if (this.renderer && this.isTileVisible(x, y)) this.renderer.addLogMessage('An alarm trap rings loudly!', 'warning');
                 break;
             }
             default: {
@@ -1642,8 +1760,8 @@ class Game {
         // Critical on natural 20
         if (naturalRoll === 20 && damage > 0) {
             damage *= 2;
-            if (this.renderer) this.renderer.addBattleLogMessage(`Critical hit! ${damage} damage!`, 'victory');
-        } else if (damage > 0 && this.renderer) {
+            if (this.renderer && this.fov && this.fov.isVisible(monster.x, monster.y)) this.renderer.addBattleLogMessage(`Critical hit! ${damage} damage!`, 'victory');
+        } else if (damage > 0 && this.renderer && this.fov && this.fov.isVisible(monster.x, monster.y)) {
             this.renderer.addBattleLogMessage(`Hit! ${damage} damage!`);
         }
         
@@ -1678,7 +1796,7 @@ class Game {
 
     // Shatter potion at impact and apply splash effects (radius 1)
     handlePotionShatter(projectile, impactX, impactY, primaryTarget = null) {
-        if (this.renderer) this.renderer.addLogMessage('The bottle shatters!');
+        if (this.renderer && this.isTileVisible(impactX, impactY)) this.renderer.addLogMessage('The bottle shatters!');
         
         // Determine primary effect amount
         let primaryAmount = 0;
@@ -1701,7 +1819,7 @@ class Game {
                 // Monster heal
                 if (typeof entity.heal === 'function') {
                     const healed = entity.heal(amount);
-                    if (healed > 0 && this.renderer) {
+                    if (healed > 0 && this.renderer && this.isTileVisible(entity.x, entity.y)) {
                         this.renderer.addBattleLogMessage(`${entity.name} is splashed by ${projectile.name}. (+${healed} HP)`, 'heal');
                     }
                 }
@@ -1748,7 +1866,7 @@ class Game {
         monster._xpGranted = true;
         
         // Victory log unified with melee style
-        if (this.renderer) {
+        if (this.renderer && this.fov && this.fov.isVisible(monster.x, monster.y)) {
             const monsterName = monster.name || 'the monster';
             this.renderer.addBattleLogMessage(`You defeat the ${monsterName}!`, 'victory');
         }
@@ -2145,9 +2263,13 @@ class Game {
             if (itemsAtPosition.length === 1) {
                 const item = itemsAtPosition[0];
                 const displayName = item.getDisplayName ? item.getDisplayName() : item.name;
-                this.renderer.addLogMessage(`You see ${displayName} here.`);
+                if (this.isTileVisible(this.player.x, this.player.y)) {
+                    this.renderer.addLogMessage(`You see ${displayName} here.`);
+                }
             } else {
-                this.renderer.addLogMessage(`You see several items here.`);
+                if (this.isTileVisible(this.player.x, this.player.y)) {
+                    this.renderer.addLogMessage(`You see several items here.`);
+                }
             }
         }
     }
@@ -2386,12 +2508,12 @@ class Game {
             
             const result = monster.statusEffects.processTurn();
             if (result.damage > 0) {
-                if (this.renderer) {
+                if (this.renderer && this.isTileVisible(monster.x, monster.y)) {
                     this.renderer.addLogMessage(`The ${monster.name} takes ${result.damage} damage from status effects!`);
                 }
                 monster.takeDirectDamage(result.damage);
                 if (!monster.isAlive) {
-                    if (this.renderer) {
+                    if (this.renderer && this.isTileVisible(monster.x, monster.y)) {
                         this.renderer.addLogMessage(`The ${monster.name} dies from its wounds!`, 'victory');
                     }
                     this.player.gainExp(monster.expValue);
@@ -2736,6 +2858,17 @@ class Game {
         if (this.noiseSystem) {
             const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
             this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
+        }
+
+        // Check trap triggering for monsters after moving onto tile
+        const tile = this.dungeon.getTile(monster.x, monster.y);
+        if (tile && tile.trap && !tile.trap.disarmed) {
+            const trap = tile.trap;
+            // Monsters don't have encumbrance; use monster-specific trigger chance
+            const willTrigger = Math.random() < this.computeTrapTriggerChanceForMonster(trap, monster);
+            if (willTrigger) {
+                this.triggerTrapAt(monster.x, monster.y, monster);
+            }
         }
     }
     

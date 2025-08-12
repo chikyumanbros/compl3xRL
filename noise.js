@@ -72,7 +72,9 @@ class NoiseSystem {
                 const extra = 0.05 * (soundLevel - 1); // +0%,+5%,+10%,+15%,+20%
                 if (Math.random() < Math.max(0, extra)) {
                     monster.statusEffects.removeEffect('sleep');
-                    if (this.game.renderer) this.game.renderer.addLogMessage(`The ${monster.name} wakes up due to noise.`);
+                    if (this.game.renderer && this.game.fov && this.game.fov.isVisible(monster.x, monster.y)) {
+                        this.game.renderer.addLogMessage(`The ${monster.name} wakes up due to noise.`);
+                    }
                 }
             }
         });

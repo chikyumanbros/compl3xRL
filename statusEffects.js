@@ -78,11 +78,16 @@ class StatusEffectManager {
                 if (roll < resistance) {
                     // Resistance successful!
                     if (window.game && window.game.renderer) {
+                        // Only log if player or visible
+                        const isPlayer = (this.entity === window.game.player);
+                        const isVisible = window.game.fov && this.entity && typeof this.entity.x === 'number' && typeof this.entity.y === 'number' && window.game.fov.isVisible(this.entity.x, this.entity.y);
+                        if (isPlayer || isVisible) {
                         const entityName = this.entity.name || 'You';
                         const message = entityName === 'You' ? 
                             `Your armor resists the ${type} effect! (${Math.floor(resistance)}% resistance)` :
                             `${entityName} resists the ${type} effect!`;
                         window.game.renderer.addLogMessage(message, 'system');
+                        }
                     }
                     return false;
                 }
@@ -360,6 +365,10 @@ class StatusEffectManager {
      */
     logEffectStart(type, severity) {
         if (!window.game || !window.game.renderer) return;
+        // Only log if player or visible
+        const isPlayerEntity = (this.entity === window.game.player);
+        const isVisibleEntity = window.game.fov && this.entity && typeof this.entity.x === 'number' && typeof this.entity.y === 'number' && window.game.fov.isVisible(this.entity.x, this.entity.y);
+        if (!isPlayerEntity && !isVisibleEntity) return;
         
         const severityText = ['lightly', 'moderately', 'severely'][severity - 1];
         const target = this.entity === window.game.player ? 'You are' : `The ${this.entity.name || 'monster'} is`;
@@ -382,6 +391,10 @@ class StatusEffectManager {
      */
     logEffectEnd(type) {
         if (!window.game || !window.game.renderer) return;
+        // Only log if player or visible
+        const isPlayerEntity = (this.entity === window.game.player);
+        const isVisibleEntity = window.game.fov && this.entity && typeof this.entity.x === 'number' && typeof this.entity.y === 'number' && window.game.fov.isVisible(this.entity.x, this.entity.y);
+        if (!isPlayerEntity && !isVisibleEntity) return;
         
         const target = this.entity === window.game.player ? 'You' : `The ${this.entity.name || 'monster'}`;
         

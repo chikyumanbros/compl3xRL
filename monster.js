@@ -55,7 +55,7 @@ class Monster {
         const integerAmount = Math.floor(amount);
         const healed = Math.max(0, Math.min(integerAmount, this.maxHp - this.hp));
         this.hp += healed;
-        if (window.game && window.game.renderer && healed > 0) {
+        if (window.game && window.game.renderer && healed > 0 && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
             window.game.renderer.addBattleLogMessage(`${this.name}: ${this.hp}/${this.maxHp} HP`, 'heal');
         }
         return healed;
@@ -1325,7 +1325,7 @@ class Monster {
         const minimumDamage = Math.ceil(damage * 0.25); // Guarantee 25% of original damage
         const finalDamage = Math.max(reducedDamage, minimumDamage);
         
-        if (window.game && window.game.renderer && (naturalProtection > 0 || penetration > 0)) {
+        if (window.game && window.game.renderer && (naturalProtection > 0 || penetration > 0) && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
             const reductionPercent = Math.round((1 - finalDamage / damage) * 100);
             window.game.renderer.addBattleLogMessage(
                 `${this.name} DR ${naturalProtection} vs AP ${penetration} = ${effectiveProtection} DR (${damage} → ${finalDamage}, ${reductionPercent}% reduced)`, 
@@ -1340,7 +1340,7 @@ class Monster {
         }
         
         // Add HP status to battle log (only if damage was actually taken)
-        if (window.game && window.game.renderer) {
+        if (window.game && window.game.renderer && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
             const hpDisplay = this.hp <= 0 ? '0' : this.hp;
             if (finalDamage > 0) {
                 window.game.renderer.addBattleLogMessage(`${this.name}: ${hpDisplay}/${this.maxHp} HP`, 'damage');
@@ -1366,7 +1366,7 @@ class Monster {
         this.hp = Math.max(0, this.hp - damage);
         
         // Add HP status to battle log
-        if (window.game && window.game.renderer) {
+        if (window.game && window.game.renderer && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
             const hpDisplay = this.hp <= 0 ? '0' : this.hp;
             window.game.renderer.addBattleLogMessage(`${this.name}: ${hpDisplay}/${this.maxHp} HP`, 'damage');
         }
@@ -1388,7 +1388,7 @@ class Monster {
         const naturalRoll = Math.floor(Math.random() * 20) + 1; // Pure d20 roll (1-20)
         const requiredRoll = player.armorClass - this.toHit; // THAC0 calculation
         
-        if (window.game && window.game.renderer) {
+        if (window.game && window.game.renderer && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
             window.game.renderer.addBattleLogMessage(`${this.name} attacks... (${naturalRoll} vs ${requiredRoll}+ needed, AC ${player.armorClass})`);
         }
         
@@ -1400,11 +1400,11 @@ class Monster {
             // Critical hit check (natural 20 only - not modified roll)
             if (naturalRoll === 20) {
                 finalDamage = baseDamage * 2;
-                if (window.game && window.game.renderer) {
+                if (window.game && window.game.renderer && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
                     window.game.renderer.addBattleLogMessage(`Critical hit! ${finalDamage} damage!`, 'damage');
                 }
             } else {
-                if (window.game && window.game.renderer) {
+                if (window.game && window.game.renderer && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
                     window.game.renderer.addBattleLogMessage(`Hit! ${finalDamage} damage!`);
                 }
             }
