@@ -586,11 +586,6 @@ class Game {
         this.itemManager = new ItemManager(this.dungeon);
         this.itemManager.spawnItems(this.currentLevel); // Spawn items based on current depth
         
-        // Spawn starting equipment around player on level 1 (new game only)
-        if (this.currentLevel === 1 && !this.visitedLevels.has(1)) {
-            this.itemManager.spawnStartingEquipment(this.player.x, this.player.y);
-        }
-        
         // Store this level
         this.saveLevelState();
         this.visitedLevels.add(this.currentLevel);

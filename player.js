@@ -704,7 +704,7 @@ class Player {
                 const usageType = naturalRoll === 20 ? 'critical' : 'normal';
                 const broke = this.equipment.weapon.takeDurabilityDamage(1, usageType);
                 if (broke) {
-                    if (window.game && window.game.renderer) {
+                if (window.game && window.game.renderer) {
                         window.game.renderer.addBattleLogMessage(
                             `Your ${this.equipment.weapon.name} breaks from the attack!`, 
                             'warning'
