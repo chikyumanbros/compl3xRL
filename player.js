@@ -2724,6 +2724,12 @@ class Player {
             modifier -= 1; // Wounded
         }
         
+        // Temporary blindness from blood in eyes
+        if (this.statusEffects && this.statusEffects.hasEffect && this.statusEffects.hasEffect('blood_eyes')) {
+            const sev = this.statusEffects.getEffectSeverity('blood_eyes') || 1;
+            modifier -= Math.min(4, sev); // up to -4
+        }
+        
         return modifier;
     }
     

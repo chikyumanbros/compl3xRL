@@ -1932,6 +1932,18 @@ class Game {
                         if (t.type !== 'floor') continue;
                         if (Math.random() < 0.5) {
                             this.dungeon.addBlood(nx, ny, Math.max(1, Math.floor(amount / 3)));
+                            // Chance to splash into eyes of anyone standing there
+                            const hitPlayer = (this.player.x === nx && this.player.y === ny);
+                            const targetMonster = this.monsterSpawner.getMonsterAt(nx, ny);
+                            if (Math.random() < 0.25) {
+                                if (hitPlayer) {
+                                    if (this.player.statusEffects) this.player.statusEffects.addEffect('blood_eyes', 2 + Math.floor(Math.random()*2), 1 + Math.floor(Math.random()*2), 'blood spatter');
+                                    if (this.renderer && this.isTileVisible(nx, ny)) this.renderer.addLogMessage('Blood splashes into your eyes!', 'warning');
+                                } else if (targetMonster && targetMonster.statusEffects) {
+                                    targetMonster.statusEffects.addEffect('blood_eyes', 2 + Math.floor(Math.random()*2), 1 + Math.floor(Math.random()*2), 'blood spatter');
+                                    if (this.renderer && this.isTileVisible(nx, ny)) this.renderer.addLogMessage(`Blood splashes into the ${targetMonster.name}'s eyes!`);
+                                }
+                            }
                         }
                     }
                 }

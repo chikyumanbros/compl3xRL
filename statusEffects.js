@@ -46,6 +46,9 @@ class StatusEffect {
             paralyzed: `Paralyzed (cannot act)`,
             sleep: `Asleep (cannot act)`
         };
+        if (this.type === 'blood_eyes') {
+            return `Eyes stung by blood (-${this.severity} to hit)`;
+        }
         return descriptions[this.type] || this.type;
     }
 }
@@ -223,6 +226,10 @@ class StatusEffectManager {
                     result.message = "The bleeding worsens!";
                 }
                 break;
+            case 'blood_eyes':
+                // No HP damage; applied as to-hit penalty via condition modifier
+                // Short-lived, decays naturally
+                break;
                 
             case 'poisoned':
                 result.damage = effect.severity;
@@ -392,7 +399,8 @@ class StatusEffectManager {
             poisoned: `${target} ${severityText} poisoned!`,
             confused: `${target} confused!`,
             paralyzed: `${target} paralyzed!`,
-            sleep: `${target} falls asleep!`
+            sleep: `${target} falls asleep!`,
+            blood_eyes: `${target} splashed in the eyes with blood!`
         };
         
         window.game.renderer.addLogMessage(messages[type] || `${target} affected by ${type}!`);
@@ -417,7 +425,8 @@ class StatusEffectManager {
             poisoned: `${target} recovered from poison.`,
             confused: `${target} regained clarity.`,
             paralyzed: `${target} can move again.`,
-            sleep: `${target} wakes up.`
+            sleep: `${target} wakes up.`,
+            blood_eyes: `${target} wipes the blood from their eyes.`
         };
         
         window.game.renderer.addLogMessage(messages[type] || `${target} recovered from ${type}.`);
