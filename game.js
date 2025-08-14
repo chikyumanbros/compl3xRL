@@ -1076,6 +1076,10 @@ class Game {
                 isAlive: monster.isAlive,
                 minDepth: monster.minDepth,
                 maxDepth: monster.maxDepth,
+                // Pack/group metadata
+                packId: monster.packId,
+                packType: monster.packType,
+                isLeader: !!monster.isLeader,
                 // AI state
                 lastSeenPlayerX: monster.lastSeenPlayerX,
                 lastSeenPlayerY: monster.lastSeenPlayerY,
@@ -1152,6 +1156,9 @@ class Game {
             monster.isAlive = monsterInfo.isAlive;
             monster.minDepth = monsterInfo.minDepth;
             monster.maxDepth = monsterInfo.maxDepth;
+                // Pack/group metadata
+                monster.packId = monsterInfo.packId || null;
+                monster.packType = monsterInfo.packType || 'solitary';
             
             // Restore AI state
             monster.lastSeenPlayerX = monsterInfo.lastSeenPlayerX || null;
@@ -1185,6 +1192,11 @@ class Game {
             monster.returnCourage = monsterInfo.returnCourage || 0.5;
             monster.fleeTimer = monsterInfo.fleeTimer || 0;
             
+            // Restore pack metadata
+            monster.packId = monsterInfo.packId || null;
+            monster.packType = monsterInfo.packType || 'solitary';
+            monster.isLeader = !!monsterInfo.isLeader;
+
             // Restore saving throw stats
             monster.constitution = monsterInfo.constitution || 10;
             monster.wisdom = monsterInfo.wisdom || 10;
@@ -1220,6 +1232,10 @@ class Game {
             
             return monster;
         });
+        // Rebuild pack registry for morale after load
+        if (typeof monsterSpawner.rebuildPacksFromMonsters === 'function') {
+            monsterSpawner.rebuildPacksFromMonsters();
+        }
         
         return monsterSpawner;
     }
@@ -1874,6 +1890,11 @@ class Game {
         // Leave a non-interactive corpse on the ground (for future extensions)
         if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
             this.itemManager.addCorpse(monster);
+        }
+
+        // Pack morale: notify spawner so that pack may break and flee
+        if (this.monsterSpawner && typeof this.monsterSpawner.processPackMoraleOnDeath === 'function') {
+            this.monsterSpawner.processPackMoraleOnDeath(monster);
         }
     }
     

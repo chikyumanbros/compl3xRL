@@ -46,6 +46,10 @@ class Monster {
         this.fleeStyle = 'direct'; // 'direct', 'evasive', 'random'
         this.returnCourage = 0.5; // Probability to stop fleeing each turn (0.0-1.0)
         this.fleeTimer = 0; // Current fleeing duration
+
+        // Pack/group metadata
+        this.packId = null; // Numeric or string identifier for pack membership
+        this.packType = 'solitary'; // 'swarm' | 'pack' | 'group' | 'pair' | 'solitary'
     }
     
     /**
@@ -1512,6 +1516,10 @@ class MonsterSpawner {
         
         // Pack behavior system (Angband-style monster groups)
         this.packBehaviors = this.initializePackBehaviors();
+
+        // Pack registry for morale checks
+        this.nextPackId = 1;
+        this.packs = new Map(); // packId -> { id, type, originalSize, aliveCount, broken, members: Set<Monster> }
     }
     
     /**
@@ -1553,14 +1561,18 @@ class MonsterSpawner {
                 const packPositions = this.generatePackPositions(room, actualPackSize, packBehavior.spacing);
                 
                 if (packPositions.length > 0) {
-            
-                    
-                    packPositions.forEach(position => {
+                    const packId = this.createPack(packBehavior.type, packPositions.length);
+                    // Choose a leader index within this pack
+                    const leaderIndex = Math.floor(Math.random() * packPositions.length);
+                    packPositions.forEach((position, idx) => {
                         if (!this.getMonsterAt(position.x, position.y)) {
-                            this.spawnSingleMonster(position.x, position.y, monsterType, currentDepth);
+                            const isLeader = (idx === leaderIndex);
+                            this.spawnSingleMonster(position.x, position.y, monsterType, currentDepth, packId, packBehavior.type, isLeader);
                             spawnedCount++;
                         }
                     });
+                    // Finalize pack leadership and morale stats
+                    this.finalizePack(packId);
                 } else {
                     // Fallback to single spawn if pack placement failed
                     const position = this.getRandomPositionInRoom(room);
@@ -1583,8 +1595,16 @@ class MonsterSpawner {
     /**
      * Spawn a single monster at specified position
      */
-    spawnSingleMonster(x, y, monsterType, currentDepth) {
+    spawnSingleMonster(x, y, monsterType, currentDepth, packId = null, packType = 'solitary', isLeader = false) {
         const monster = new Monster(x, y, monsterType);
+        if (packId) {
+            monster.packId = packId;
+            monster.packType = packType || 'pack';
+            this.registerMonsterInPack(monster, packId, packType);
+        }
+        if (isLeader) {
+            monster.isLeader = true;
+        }
         
         // Classic roguelike: some monsters start awake (especially dangerous ones)
         const awakeProbability = this.getAwakeProbability(monster, currentDepth);
@@ -1594,6 +1614,197 @@ class MonsterSpawner {
         
         this.monsters.push(monster);
 
+    }
+
+    /**
+     * Create a new pack record and return its id
+     */
+    createPack(packType = 'pack', size = 1) {
+        const id = this.nextPackId++;
+        this.packs.set(id, {
+            id,
+            type: packType,
+            originalSize: size,
+            aliveCount: size,
+            broken: false,
+            members: new Set()
+        });
+        return id;
+    }
+
+    /**
+     * Register monster into a pack
+     */
+    registerMonsterInPack(monster, packId, packType = 'pack') {
+        const pack = this.packs.get(packId);
+        if (!pack) return;
+        pack.members.add(monster);
+        // Keep type consistent
+        pack.type = packType || pack.type;
+    }
+
+    /**
+     * Finalize pack info after members are spawned
+     */
+    finalizePack(packId) {
+        const pack = this.packs.get(packId);
+        if (!pack) return;
+        // Determine leader
+        let leader = null;
+        // Prefer explicitly marked leader
+        pack.members.forEach(m => { if (!leader && m.isLeader) leader = m; });
+        // If none flagged, pick the toughest by maxHp then toHit
+        if (!leader) {
+            pack.members.forEach(m => {
+                if (!leader) leader = m;
+                else if (m.maxHp > leader.maxHp || (m.maxHp === leader.maxHp && m.toHit > leader.toHit)) leader = m;
+            });
+            if (leader) leader.isLeader = true;
+        }
+        pack.leader = leader || null;
+        // Compute leadership value (2d6 test target)
+        pack.leadership = this.computePackLeadership(pack);
+        // Update counts
+        pack.originalSize = pack.members.size;
+        let alive = 0;
+        pack.members.forEach(m => { if (m.isAlive) alive++; });
+        pack.aliveCount = alive;
+    }
+
+    /**
+     * Compute pack leadership score based on type and composition
+     * Higher is better. Typical range 5-9 for 2d6 tests.
+     */
+    computePackLeadership(pack) {
+        const baseByType = { swarm: 5, pack: 7, group: 8, pair: 8, solitary: 10 };
+        let leadership = baseByType[pack.type] ?? 7;
+        // Small bonus if leader is alive
+        if (pack.leader && pack.leader.isAlive) leadership += 2;
+        // Composition tweak: if most members are smart/genius, add +1; if many mindless, -1
+        let smart = 0, total = 0, mindless = 0;
+        pack.members.forEach(m => {
+            total++;
+            if (m.intelligence === 'smart' || m.intelligence === 'genius') smart++;
+            if (m.intelligence === 'mindless') mindless++;
+        });
+        if (total > 0) {
+            if (smart / total >= 0.6) leadership += 1;
+            if (mindless / total >= 0.6) leadership -= 1;
+        }
+        return Math.max(3, Math.min(10, leadership));
+    }
+
+    /**
+     * Determine break threshold by pack type (casualties to cause flee)
+     */
+    getPackBreakThreshold(originalSize, packType) {
+        // casualties fraction required to break (Warhammer-ish)
+        const fractionByType = {
+            swarm: 0.6, // break when <= 40% remain
+            pack: 0.5,  // break when <= 50% remain
+            group: 0.5, // break when <= 50% remain
+            pair: 0.5,  // break when one dies (<= 1/2 remain)
+            solitary: 0.0
+        };
+        const frac = fractionByType[packType] ?? 0.5;
+        return Math.max(1, Math.floor(originalSize * (1 - frac)) < originalSize ? Math.ceil(originalSize * (1 - frac)) : Math.floor(originalSize / 2));
+    }
+
+    /**
+     * Called when a pack member dies to potentially break the pack
+     */
+    processPackMoraleOnDeath(monster) {
+        if (!monster || !monster.packId) return;
+        const pack = this.packs.get(monster.packId);
+        if (!pack || pack.broken) return;
+
+        // Recompute alive count from members to be robust
+        let alive = 0;
+        pack.members.forEach(m => { if (m && m.isAlive) alive++; });
+        pack.aliveCount = alive;
+
+        const breakAtRemain = Math.ceil(pack.originalSize * 0.5); // default remain threshold (50%)
+        const remainThresholdByType = {
+            swarm: Math.ceil(pack.originalSize * 0.4),
+            pack: Math.ceil(pack.originalSize * 0.5),
+            group: Math.ceil(pack.originalSize * 0.5),
+            pair: 1
+        };
+        const thresholdRemain = remainThresholdByType[pack.type] ?? breakAtRemain;
+
+        if (pack.aliveCount <= thresholdRemain && pack.originalSize > 1) {
+            // Panic test (2d6 vs leadership)
+            const d6 = () => Math.floor(Math.random() * 6) + 1;
+            const roll = d6() + d6();
+            let leadership = pack.leadership || this.computePackLeadership(pack);
+            // Casualties penalty: if 50%超の損耗なら -1
+            const casualties = pack.originalSize - pack.aliveCount;
+            if (casualties / pack.originalSize >= 0.5) leadership -= 1;
+            const passed = roll <= leadership;
+            if (passed) {
+                // Optional: short wavering debuff; here just log if visible
+                if (window.game && window.game.renderer) {
+                    // Log if any member visible
+                    let anyVisible = false;
+                    pack.members.forEach(m => { if (!anyVisible && m.isAlive && window.game.isTileVisible && window.game.isTileVisible(m.x, m.y)) anyVisible = true; });
+                    if (anyVisible) window.game.renderer.addBattleLogMessage('The pack wavers but holds!', 'normal');
+                }
+                return;
+            }
+
+            pack.broken = true;
+            // Set all living members to flee (panic style)
+            let anyVisible = false;
+            pack.members.forEach(m => {
+                if (m && m.isAlive) {
+                    m.isFleeing = true;
+                    m.fleePersonality = 'panicked';
+                    m.fleeStyle = 'random';
+                    m.fleeTimer = 0;
+                    m.fleeDuration = Math.max(m.fleeDuration, 10);
+                    if (!anyVisible && window.game && window.game.isTileVisible && window.game.isTileVisible(m.x, m.y)) {
+                        anyVisible = true;
+                    }
+                }
+            });
+            // Log once if any member visible
+            if (anyVisible && window.game && window.game.renderer) {
+                const label = pack.type === 'pair' ? 'pair' : (pack.type || 'pack');
+                window.game.renderer.addBattleLogMessage(`The ${label} fails its nerve and flees!`, 'warning');
+            }
+        }
+    }
+
+    /**
+     * Rebuild pack registry from monsters (after load)
+     */
+    rebuildPacksFromMonsters() {
+        this.packs = new Map();
+        this.nextPackId = 1;
+        // Detect existing packIds and group
+        const grouped = new Map(); // id -> {type, members}
+        this.monsters.forEach(m => {
+            if (m.packId) {
+                const entry = grouped.get(m.packId) || { type: m.packType || 'pack', members: [] };
+                entry.type = m.packType || entry.type;
+                entry.members.push(m);
+                grouped.set(m.packId, entry);
+            }
+        });
+        // Create pack records
+        grouped.forEach((entry, id) => {
+            const packId = Number(id);
+            const pack = {
+                id: packId,
+                type: entry.type,
+                originalSize: entry.members.length,
+                aliveCount: entry.members.filter(m => m.isAlive).length,
+                broken: false,
+                members: new Set(entry.members)
+            };
+            this.packs.set(packId, pack);
+            this.nextPackId = Math.max(this.nextPackId, packId + 1);
+        });
     }
     
     /**
