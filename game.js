@@ -1679,7 +1679,11 @@ class Game {
                     const outcome = this.attemptThrownAttack(projectile, target, distance);
                     if (outcome.hit) {
                         // Non-potion items drop at the impact tile after a resolved hit
-                        this.dropProjectileAt(projectile, x, y);
+                        if (projectile.type === 'corpse') {
+                            if (this.renderer) this.renderer.addBattleLogMessage('The corpse is destroyed on impact.', 'warning');
+                        } else {
+                            this.dropProjectileAt(projectile, x, y);
+                        }
                         // Durability wear on thrown weapon on hit
                         if ((projectile.type === 'weapon' || projectile.weaponDamage) && typeof projectile.takeDurabilityDamage === 'function') {
                             const broke = projectile.takeDurabilityDamage(1, 'thrown_hit');
@@ -1706,6 +1710,8 @@ class Game {
         // No hit: if potion, shatter at landing; otherwise, drop on ground
         if (projectile.type === 'potion') {
             this.handlePotionShatter(projectile, lastFreeX, lastFreeY, null);
+        } else if (projectile.type === 'corpse') {
+            if (this.renderer) this.renderer.addLogMessage('The corpse splatters and is destroyed.', 'warning');
         } else {
             this.dropProjectileAt(projectile, lastFreeX, lastFreeY);
             // Durability wear on thrown item landing
