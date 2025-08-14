@@ -1920,6 +1920,22 @@ class Game {
             // Amount based on monster max HP (capped)
             const amount = Math.max(1, Math.min(10, Math.floor((monster.maxHp || 6) / 4)));
             this.dungeon.addBlood(monster.x, monster.y, amount);
+            // Occasionally spatter to nearby tiles randomly
+            if (Math.random() < 0.4) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = monster.x + dx;
+                        const ny = monster.y + dy;
+                        if (!this.dungeon.isInBounds(nx, ny)) continue;
+                        const t = this.dungeon.getTile(nx, ny);
+                        if (t.type !== 'floor') continue;
+                        if (Math.random() < 0.5) {
+                            this.dungeon.addBlood(nx, ny, Math.max(1, Math.floor(amount / 3)));
+                        }
+                    }
+                }
+            }
         }
 
         // Pack morale: notify spawner so that pack may break and flee
@@ -2603,6 +2619,22 @@ class Game {
                     if (this.dungeon && typeof this.dungeon.addBlood === 'function') {
                         const amount = Math.max(1, Math.min(10, Math.floor((monster.maxHp || 6) / 4)));
                         this.dungeon.addBlood(monster.x, monster.y, amount);
+                        // Occasionally spatter to nearby tiles randomly
+                        if (Math.random() < 0.4) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                                for (let dy = -1; dy <= 1; dy++) {
+                                    if (dx === 0 && dy === 0) continue;
+                                    const nx = monster.x + dx;
+                                    const ny = monster.y + dy;
+                                    if (!this.dungeon.isInBounds(nx, ny)) continue;
+                                    const t = this.dungeon.getTile(nx, ny);
+                                    if (t.type !== 'floor') continue;
+                                    if (Math.random() < 0.5) {
+                                        this.dungeon.addBlood(nx, ny, Math.max(1, Math.floor(amount / 3)));
+                                    }
+                                }
+                            }
+                        }
                     }
                     return;
                 }
