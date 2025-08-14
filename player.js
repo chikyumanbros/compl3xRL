@@ -177,8 +177,27 @@ class Player {
      * Move the player to a new position
      */
     moveTo(x, y) {
+        // Footprint pick-up from current tile
+        if (window.game && window.game.dungeon) {
+            const currentTile = window.game.dungeon.getTile(this.x, this.y);
+            if (currentTile && currentTile.type === 'floor' && currentTile.blood && currentTile.blood > 0) {
+                const take = Math.random() < 0.5 ? 1 : 0;
+                if (take > 0) {
+                    currentTile.blood = Math.max(0, currentTile.blood - take);
+                    this._carriedBlood = Math.min(3, (this._carriedBlood || 0) + take);
+                }
+            }
+        }
         this.x = x;
         this.y = y;
+        // Drop carried blood on new tile
+        if (this._carriedBlood && this._carriedBlood > 0 && window.game && window.game.dungeon) {
+            const newTile = window.game.dungeon.getTile(this.x, this.y);
+            if (newTile && newTile.type === 'floor') {
+                window.game.dungeon.addBlood(this.x, this.y, this._carriedBlood);
+                this._carriedBlood = 0;
+            }
+        }
         this.turnCount++;
         
         // Update speed after movement (hunger affects speed)
@@ -188,6 +207,18 @@ class Player {
         // Nutrition is consumed per-turn in processHunger()
         
         this.checkRegeneration();
+
+        // Slip chance on blood for player
+        if (window.game && window.game.dungeon) {
+            const t = window.game.dungeon.getTile(this.x, this.y);
+            if (t && t.type === 'floor' && t.blood && t.blood > 0) {
+                const slipChance = Math.min(0.25, t.blood * 0.025);
+                if (Math.random() < slipChance) {
+                    if (this.statusEffects) this.statusEffects.addEffect('stunned', 1, 1, 'blood slip');
+                    if (window.game.renderer) window.game.renderer.addLogMessage('You slip on the blood!', 'warning');
+                }
+            }
+        }
 
         // Trap detection on entering tile (chance to reveal) + slight nearby auto-detect
         if (window.game && window.game.dungeon) {

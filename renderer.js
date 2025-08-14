@@ -198,6 +198,12 @@ class Renderer {
                                     if (tile.blood >= 7) color = 'blood_high';
                                     else if (tile.blood >= 3) color = 'blood_mid';
                                     else color = 'blood_low';
+                                } else if (visibility.visible && tile.liquids && Object.keys(tile.liquids).length > 0) {
+                                    // Generic liquids: tint color by dominant type
+                                    const types = Object.entries(tile.liquids).sort((a,b)=>b[1]-a[1]);
+                                    const main = types[0]?.[0];
+                                    if (main === 'potion') color = 'potion_spill';
+                                    else color = 'blood_mid';
                                 } else {
                                     color = visibility.visible ? 'floor' : 'floor_memory';
                                 }

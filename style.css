@@ -392,6 +392,7 @@ body {
 .blood_low { color: #aa4444; }
 .blood_mid { color: #cc0000; }
 .blood_high { color: #ff0000; }
+.potion_spill { color: #66aaff; }
 
 /* Memory/explored but not visible colors */
 .wall_memory { color: #404040; }

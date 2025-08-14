@@ -27,7 +27,9 @@ class Dungeon {
                     type: 'wall',
                     visible: false,
                     explored: false,
-                    blood: 0
+                    blood: 0,
+                    scent: 0,
+                    liquids: {}
                 };
             }
         }
@@ -110,6 +112,110 @@ class Dungeon {
         const current = typeof tile.blood === 'number' ? tile.blood : 0;
         tile.blood = Math.max(0, Math.min(10, current + Math.max(1, Math.floor(amount))));
         return true;
+    }
+
+    /**
+     * Add scent to a tile (used by monsters to sniff the player)
+     */
+    addScent(x, y, amount = 1) {
+        if (!this.isInBounds(x, y)) return false;
+        const tile = this.getTile(x, y);
+        const current = typeof tile.scent === 'number' ? tile.scent : 0;
+        tile.scent = Math.max(0, Math.min(1000, current + Math.max(1, Math.floor(amount))));
+        return true;
+    }
+
+    /**
+     * Spill a generic liquid type on a tile
+     */
+    addLiquid(x, y, type, amount = 1) {
+        if (!this.isInBounds(x, y)) return false;
+        const tile = this.getTile(x, y);
+        if (!tile.liquids) tile.liquids = {};
+        tile.liquids[type] = (tile.liquids[type] || 0) + Math.max(1, Math.floor(amount));
+        return true;
+    }
+
+    /**
+     * Simulate drying/diffusion for blood and liquids; decay scent
+     */
+    stepLiquids() {
+        const width = this.width, height = this.height;
+        // Blood diffusion staged deltas
+        const bloodDelta = Array.from({ length: height }, () => Array(width).fill(0));
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const t = this.tiles[y][x];
+                // Scent decay
+                if (t.scent && t.scent > 0) {
+                    t.scent = Math.max(0, t.scent - 1);
+                }
+                // Only operate on floor-like tiles
+                if (t.type !== 'floor') continue;
+                // Blood drying
+                if (t.blood && t.blood > 0) {
+                    if (Math.random() < 0.2) {
+                        t.blood = Math.max(0, t.blood - 1);
+                    }
+                    // Diffuse if enough blood is present
+                    if (t.blood >= 3 && Math.random() < 0.2) {
+                        const dirs = [
+                            [1, 0], [-1, 0], [0, 1], [0, -1]
+                        ];
+                        const candidates = [];
+                        for (const [dx, dy] of dirs) {
+                            const nx = x + dx, ny = y + dy;
+                            if (!this.isInBounds(nx, ny)) continue;
+                            const nt = this.tiles[ny][nx];
+                            if (nt.type === 'floor') {
+                                candidates.push({ nx, ny, level: nt.blood || 0 });
+                            }
+                        }
+                        if (candidates.length > 0) {
+                            // Prefer tiles with less blood
+                            candidates.sort((a, b) => a.level - b.level);
+                            const pick = candidates[0];
+                            bloodDelta[ny = pick.ny][nx = pick.nx] += 1;
+                            bloodDelta[y][x] -= 1;
+                        }
+                    }
+                }
+                // Generic liquid evaporation/diffusion (lightweight)
+                if (t.liquids) {
+                    for (const key of Object.keys(t.liquids)) {
+                        if (t.liquids[key] <= 0) { delete t.liquids[key]; continue; }
+                        // Evaporate slowly
+                        if (Math.random() < 0.2) {
+                            t.liquids[key] = Math.max(0, t.liquids[key] - 1);
+                            if (t.liquids[key] === 0) delete t.liquids[key];
+                        }
+                        // Simple spread
+                        if (t.liquids[key] >= 3 && Math.random() < 0.15) {
+                            const dirs = [ [1,0],[-1,0],[0,1],[0,-1] ];
+                            const [dx, dy] = dirs[Math.floor(Math.random() * dirs.length)];
+                            const nx = x + dx, ny = y + dy;
+                            if (this.isInBounds(nx, ny) && this.tiles[ny][nx].type === 'floor') {
+                                if (!this.tiles[ny][nx].liquids) this.tiles[ny][nx].liquids = {};
+                                this.tiles[ny][nx].liquids[key] = (this.tiles[ny][nx].liquids[key] || 0) + 1;
+                                t.liquids[key] -= 1;
+                                if (t.liquids[key] === 0) delete t.liquids[key];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Apply blood deltas
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const delta = bloodDelta[y][x];
+                if (delta !== 0) {
+                    const t = this.tiles[y][x];
+                    t.blood = Math.max(0, Math.min(10, (t.blood || 0) + delta));
+                }
+            }
+        }
     }
     
     /**

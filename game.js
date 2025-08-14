@@ -1815,6 +1815,23 @@ class Game {
     handlePotionShatter(projectile, impactX, impactY, primaryTarget = null) {
         if (this.renderer && this.isTileVisible(impactX, impactY)) this.renderer.addLogMessage('The bottle shatters!');
         
+        // Spill liquid on ground based on potion potency
+        if (this.dungeon && typeof this.dungeon.addLiquid === 'function') {
+            const baseSpill = projectile.healDice ? Math.max(1, Math.floor((rollDice(projectile.healDice) || 4) / 2)) : (projectile.healAmount ? Math.floor(projectile.healAmount / 2) : 2);
+            // Center tile
+            this.dungeon.addLiquid(impactX, impactY, 'potion', Math.min(5, baseSpill));
+            // Neighbor tiles get small splash
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
+                    const x = impactX + dx;
+                    const y = impactY + dy;
+                    if (!this.dungeon.isInBounds(x, y)) continue;
+                    this.dungeon.addLiquid(x, y, 'potion', 1);
+                }
+            }
+        }
+
         // Determine primary effect amount
         let primaryAmount = 0;
         if (projectile.healDice) {
@@ -1896,6 +1913,13 @@ class Game {
         // Leave a non-interactive corpse on the ground (for future extensions)
         if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
             this.itemManager.addCorpse(monster);
+        }
+
+        // Spill blood at death location (off-screen as well)
+        if (this.dungeon && typeof this.dungeon.addBlood === 'function') {
+            // Amount based on monster max HP (capped)
+            const amount = Math.max(1, Math.min(10, Math.floor((monster.maxHp || 6) / 4)));
+            this.dungeon.addBlood(monster.x, monster.y, amount);
         }
 
         // Pack morale: notify spawner so that pack may break and flee
@@ -2446,6 +2470,11 @@ class Game {
         
         // Process player hunger system
         this.player.processHunger();
+
+        // Leave scent trail (used by sniffing AI)
+        if (this.dungeon && typeof this.dungeon.addScent === 'function') {
+            this.dungeon.addScent(this.player.x, this.player.y, 5);
+        }
         
         // Check player regeneration (now hunger-dependent)
         this.player.checkRegeneration();
@@ -2480,6 +2509,10 @@ class Game {
         
         // Process energy-based turns for all entities
         this.processEnergyTurns();
+        // World step: liquids diffusion/drying, scent decay
+        if (this.dungeon && typeof this.dungeon.stepLiquids === 'function') {
+            this.dungeon.stepLiquids();
+        }
         
         // Immediate autosave after every action
         if (this.autosaveEnabled && this.gameState === 'playing') {
@@ -2565,6 +2598,11 @@ class Game {
                     // Drop corpse for DoT deaths
                     if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
                         this.itemManager.addCorpse(monster);
+                    }
+                    // Blood spill on death (off-screen too)
+                    if (this.dungeon && typeof this.dungeon.addBlood === 'function') {
+                        const amount = Math.max(1, Math.min(10, Math.floor((monster.maxHp || 6) / 4)));
+                        this.dungeon.addBlood(monster.x, monster.y, amount);
                     }
                     return;
                 }
@@ -2900,13 +2938,41 @@ class Game {
      * Execute monster movement and generate sound
      */
     executeMonsterMove(monster, newX, newY) {
+        // Footprints: pickup from current tile
+        if (this.dungeon) {
+            const t = this.dungeon.getTile(monster.x, monster.y);
+            if (t && t.type === 'floor' && t.blood && t.blood > 0 && Math.random() < 0.3) {
+                t.blood = Math.max(0, t.blood - 1);
+                if (!monster._carriedBlood) monster._carriedBlood = 0;
+                monster._carriedBlood = Math.min(2, monster._carriedBlood + 1);
+            }
+        }
         monster.x = newX;
         monster.y = newY;
+        if (monster._carriedBlood && monster._carriedBlood > 0 && this.dungeon) {
+            const dt = this.dungeon.getTile(monster.x, monster.y);
+            if (dt && dt.type === 'floor') {
+                this.dungeon.addBlood(monster.x, monster.y, monster._carriedBlood);
+                monster._carriedBlood = 0;
+            }
+        }
         
         // Generate monster movement sound
         if (this.noiseSystem) {
             const soundType = monster.isFleeing ? 'MONSTER_FLEE' : 'MONSTER_MOVE';
             this.noiseSystem.makeSound(monster.x, monster.y, this.noiseSystem.getMonsterActionSound(soundType));
+        }
+
+        // Slip chance on blood
+        if (this.dungeon) {
+            const t = this.dungeon.getTile(monster.x, monster.y);
+            if (t && t.type === 'floor' && t.blood && t.blood > 0 && Math.random() < Math.min(0.2, t.blood * 0.02)) {
+                // Skip action next turn (simple stun)
+                if (monster.statusEffects) monster.statusEffects.addEffect('stunned', 1, 1, 'blood slip');
+                if (this.renderer && this.isTileVisible(monster.x, monster.y)) {
+                    this.renderer.addLogMessage(`The ${monster.name} slips on the blood!`);
+                }
+            }
         }
 
         // Check trap triggering for monsters after moving onto tile
@@ -3375,6 +3441,7 @@ class Game {
             const door = doors[0];
             if (this.player.closeDoor(door.x, door.y, this.dungeon)) {
                 this.processTurn();
+                this.render();
             }
                 } else {
             // Multiple doors, ask which one to close
@@ -3426,9 +3493,11 @@ class Game {
             if (door.state === 'locked') {
                 this.renderer.addLogMessage('The door is locked.');
                 this.processTurn(); // Turn consumed by trying
+                this.render();
             } else {
                 if (this.player.openDoor(door.x, door.y, this.dungeon)) {
                     this.processTurn();
+                    this.render();
                 }
             }
         } else {
@@ -3483,6 +3552,7 @@ class Game {
         if (selectedDoor) {
             if (this.player.closeDoor(selectedDoor.x, selectedDoor.y, this.dungeon)) {
                 this.processTurn();
+                this.render();
             }
             this.gameState = 'playing';
             this.doorChoices = null;
@@ -3534,9 +3604,11 @@ class Game {
             if (selectedDoor.state === 'locked') {
                 this.renderer.addLogMessage('The door is locked.');
                 this.processTurn(); // Turn consumed by trying
+                this.render();
             } else {
                 if (this.player.openDoor(selectedDoor.x, selectedDoor.y, this.dungeon)) {
                     this.processTurn();
+                    this.render();
                 }
             }
             this.gameState = 'playing';
