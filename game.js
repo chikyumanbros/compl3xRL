@@ -1925,6 +1925,16 @@ class Game {
      * Handle keyboard input
      */
     handleKeyPress(event) {
+        // If in a door selection state, handle it first and do not let it leak into next turn
+        if (this.gameState === 'door_opening') {
+            this.handleDoorOpeningInput(event);
+            return;
+        }
+        if (this.gameState === 'door_closing') {
+            this.handleDoorClosingInput(event);
+            return;
+        }
+
         // If awaiting throw direction, intercept direction keys
         if (this.awaitingThrowDirection) {
             const dir = this.getDirectionFromKey(event);
@@ -2449,6 +2459,10 @@ class Game {
                     this.renderer.addLogMessage(`You take ${result.damage} damage from status effects!`, 'damage');
                 }
                 this.player.takeDirectDamage(result.damage);
+                // Blood spill on the ground if bleeding
+                if (this.dungeon && this.player.statusEffects && this.player.statusEffects.hasEffect && this.player.statusEffects.hasEffect('bleeding')) {
+                    this.dungeon.addBlood(this.player.x, this.player.y, result.damage);
+                }
             }
             // Then log other messages (recovery, etc.)
             for (const message of result.messages) {
@@ -2539,6 +2553,10 @@ class Game {
                     this.renderer.addLogMessage(`The ${monster.name} takes ${result.damage} damage from status effects!`);
                 }
                 monster.takeDirectDamage(result.damage);
+                // Blood spill for bleeding monsters
+                if (this.dungeon && monster.statusEffects && monster.statusEffects.hasEffect && monster.statusEffects.hasEffect('bleeding')) {
+                    this.dungeon.addBlood(monster.x, monster.y, result.damage);
+                }
                 if (!monster.isAlive) {
                     if (this.renderer && this.isTileVisible(monster.x, monster.y)) {
                         this.renderer.addLogMessage(`The ${monster.name} dies from its wounds!`, 'victory');

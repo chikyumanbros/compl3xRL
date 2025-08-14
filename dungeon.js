@@ -26,7 +26,8 @@ class Dungeon {
                 this.tiles[y][x] = {
                     type: 'wall',
                     visible: false,
-                    explored: false
+                    explored: false,
+                    blood: 0
                 };
             }
         }
@@ -98,6 +99,17 @@ class Dungeon {
             return true;
         }
         return false;
+    }
+    
+    /**
+     * Add blood to a tile (accumulates up to a cap)
+     */
+    addBlood(x, y, amount = 1) {
+        if (!this.isInBounds(x, y)) return false;
+        const tile = this.getTile(x, y);
+        const current = typeof tile.blood === 'number' ? tile.blood : 0;
+        tile.blood = Math.max(0, Math.min(10, current + Math.max(1, Math.floor(amount))));
+        return true;
     }
     
     /**

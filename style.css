@@ -389,6 +389,9 @@ body {
 .trap_pit { color: #66ccff; }    /* cyan: fall/impact */
 .trap_alarm { color: #ff00ff; }  /* magenta: alarm */
 .corpse { color: #996633; }
+.blood_low { color: #aa4444; }
+.blood_mid { color: #cc0000; }
+.blood_high { color: #ff0000; }
 
 /* Memory/explored but not visible colors */
 .wall_memory { color: #404040; }

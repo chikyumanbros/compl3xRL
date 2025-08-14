@@ -93,6 +93,9 @@ class Renderer {
             monster: 'monster',
             item: 'item',
             corpse: 'corpse',
+            blood_low: 'blood_low',
+            blood_mid: 'blood_mid',
+            blood_high: 'blood_high',
             stairs: 'stairs'
         };
         
@@ -190,7 +193,14 @@ class Renderer {
                                 else color = 'floor';
                             } else {
                                 char = this.symbols.floor;
-                                color = visibility.visible ? 'floor' : 'floor_memory';
+                                // Blood overlay when visible (3 levels)
+                                if (visibility.visible && tile.blood && tile.blood > 0) {
+                                    if (tile.blood >= 7) color = 'blood_high';
+                                    else if (tile.blood >= 3) color = 'blood_mid';
+                                    else color = 'blood_low';
+                                } else {
+                                    color = visibility.visible ? 'floor' : 'floor_memory';
+                                }
                             }
                             break;
                                             case 'door':

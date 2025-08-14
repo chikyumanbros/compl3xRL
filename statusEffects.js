@@ -111,6 +111,18 @@ class StatusEffectManager {
         const effect = new StatusEffect(type, duration, severity, source);
         this.effects.set(type, effect);
         
+        // Immediate side-effect: spawn initial blood on effect start
+        if (type === 'bleeding') {
+            try {
+                if (window.game && window.game.dungeon && this.entity && typeof this.entity.x === 'number' && typeof this.entity.y === 'number') {
+                    // Small initial amount based on severity (1-3)
+                    window.game.dungeon.addBlood(this.entity.x, this.entity.y, Math.max(1, severity));
+                }
+            } catch (e) {
+                // fail-safe: ignore
+            }
+        }
+        
         // Log the effect
         this.logEffectStart(type, severity);
         
