@@ -28,6 +28,7 @@ class Dungeon {
                     visible: false,
                     explored: false,
                     blood: 0,
+                    bloodStain: 0,
                     scent: 0,
                     liquids: {}
                 };
@@ -111,6 +112,9 @@ class Dungeon {
         const tile = this.getTile(x, y);
         const current = typeof tile.blood === 'number' ? tile.blood : 0;
         tile.blood = Math.max(0, Math.min(10, current + Math.max(1, Math.floor(amount))));
+        // Leave a persistent stain as well (faint color even when dried)
+        const stainCurrent = typeof tile.bloodStain === 'number' ? tile.bloodStain : 0;
+        tile.bloodStain = Math.max(stainCurrent, Math.min(10, stainCurrent + Math.max(1, Math.ceil(amount / 2))));
         return true;
     }
 
@@ -176,9 +180,15 @@ class Dungeon {
                             // Prefer tiles with less blood
                             candidates.sort((a, b) => a.level - b.level);
                             const pick = candidates[0];
-                            bloodDelta[ny = pick.ny][nx = pick.nx] += 1;
+                            const nx = pick.nx;
+                            const ny = pick.ny;
+                            bloodDelta[ny][nx] += 1;
                             bloodDelta[y][x] -= 1;
                         }
+                    }
+                    // While wet blood exists, deepen the stain slowly
+                    if (t.blood > 0 && Math.random() < 0.1) {
+                        t.bloodStain = Math.min(10, (t.bloodStain || 0) + 1);
                     }
                 }
                 // Generic liquid evaporation/diffusion (lightweight)

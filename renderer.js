@@ -193,10 +193,13 @@ class Renderer {
                                 else color = 'floor';
                             } else {
                                 char = this.symbols.floor;
-                                // Blood overlay when visible (3 levels)
-                                if (visibility.visible && tile.blood && tile.blood > 0) {
-                                    if (tile.blood >= 7) color = 'blood_high';
-                                    else if (tile.blood >= 3) color = 'blood_mid';
+                                // Blood overlay when visible (3 levels) or dried stain
+                                const wet = tile.blood || 0;
+                                const stain = tile.bloodStain || 0;
+                                if (visibility.visible && (wet > 0 || stain > 0)) {
+                                    const level = wet > 0 ? wet : Math.ceil(stain / 3); // dried stain appears lighter
+                                    if (level >= 7) color = 'blood_high';
+                                    else if (level >= 3) color = 'blood_mid';
                                     else color = 'blood_low';
                                 } else if (visibility.visible && tile.liquids && Object.keys(tile.liquids).length > 0) {
                                     // Generic liquids: tint color by dominant type
