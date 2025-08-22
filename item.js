@@ -1245,7 +1245,7 @@ const EQUIPMENT_TYPES = {
         warhammer: {
             name: 'War Hammer',
             type: 'weapon',
-            category: EQUIPMENT_CATEGORIES.ONE_HANDED_WEAPON,
+            category: EQUIPMENT_CATEGORIES.TWO_HANDED_WEAPON,
             weaponType: WEAPON_TYPES.HAMMER,
             damage: 4,
             weaponDamage: 8, // d8
@@ -1255,7 +1255,7 @@ const EQUIPMENT_TYPES = {
             material: 'steel',
             symbol: 'T',
             color: '#E0E0E0',
-            description: 'A steel war hammer. Designed to crush heavy armor. (1d8+4 damage, AP 3)'
+            description: 'A two-handed steel war hammer. Designed to crush heavy armor. (1d8+4 damage, AP 3)'
         },
         maul: {
             name: 'Maul',
