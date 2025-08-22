@@ -148,6 +148,10 @@ class Game {
                 const dmg = 1 + Math.floor(Math.random() * 4); // 1d4
                 entity.takeDirectDamage(dmg);
                 if (this.renderer && (isPlayer || this.isTileVisible(x, y))) this.renderer.addBattleLogMessage(`A dart hits ${targetName} for ${dmg} damage!`, 'damage');
+                // Check if monster died from trap damage
+                if (!isPlayer && !entity.isAlive) {
+                    this.handleMonsterDefeated(entity, 'trap');
+                }
                 break;
             }
             case 'snare': {
@@ -202,6 +206,10 @@ class Game {
                     entity.statusEffects.addEffect('fractured', 4 + Math.floor(Math.random() * 4), 1, 'trap');
                 }
                 if (this.renderer && (isPlayer || this.isTileVisible(x, y))) this.renderer.addBattleLogMessage(`${isPlayer ? 'You fall' : `The ${entity.name} falls`} into a pit! ${dmg} damage and a fracture!`, 'damage');
+                // Check if monster died from trap damage
+                if (!isPlayer && !entity.isAlive) {
+                    this.handleMonsterDefeated(entity, 'trap');
+                }
                 break;
             }
             case 'alarm': {
