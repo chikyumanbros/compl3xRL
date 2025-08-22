@@ -993,7 +993,7 @@ class Dungeon {
     addTraps() {
         // Determine approximate number of traps based on map size
         const area = this.width * this.height;
-        const targetCount = Math.max(5, Math.floor(area * 0.005)); // ~0.5% of tiles, minimum 5
+        const targetCount = Math.max(2, Math.floor(area * 0.002)); // ~0.2% of tiles, minimum 2
 
         let placed = 0;
         let attempts = 0;
@@ -1011,9 +1011,9 @@ class Dungeon {
             if (tile.trap) continue;
 
             // Bias: Corridors, junctions, room entrances slightly more likely
-            const corridorBias = this.isCorridor(x, y) ? 1.5 : 1.0;
-            const junctionBias = this.isJunction(x, y) ? 1.5 : 1.0;
-            if (Math.random() > 0.35 * corridorBias * junctionBias) continue;
+            const corridorBias = this.isCorridor(x, y) ? 1.3 : 1.0;
+            const junctionBias = this.isJunction(x, y) ? 1.3 : 1.0;
+            if (Math.random() > 0.25 * corridorBias * junctionBias) continue;
 
             const trap = this.createRandomTrap();
             tile.trap = trap;
