@@ -1910,9 +1910,25 @@ class Game {
             this.player.gainExp(monster.expValue);
         }
 
-        // Leave a non-interactive corpse on the ground (for future extensions)
+        // Chance to leave a corpse based on death cause and monster type
         if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
-            this.itemManager.addCorpse(monster);
+            const corpseChance = this.calculateCorpseChance(monster, cause);
+            if (Math.random() < corpseChance) {
+                this.itemManager.addCorpse(monster);
+                if (this.renderer && this.fov && this.fov.isVisible(monster.x, monster.y)) {
+                    this.renderer.addBattleLogMessage('A corpse remains.', 'normal');
+                }
+            } else {
+                if (this.renderer && this.fov && this.fov.isVisible(monster.x, monster.y)) {
+                    const destroyMessages = [
+                        'The body is utterly destroyed.',
+                        'Nothing remains but a bloody mess.',
+                        'The corpse is completely mangled.',
+                        'Only scattered remains are left.'
+                    ];
+                    this.renderer.addBattleLogMessage(destroyMessages[Math.floor(Math.random() * destroyMessages.length)], 'normal');
+                }
+            }
         }
 
         // Spill blood at death location (off-screen as well)
@@ -1954,6 +1970,62 @@ class Game {
         if (this.monsterSpawner && typeof this.monsterSpawner.processPackMoraleOnDeath === 'function') {
             this.monsterSpawner.processPackMoraleOnDeath(monster);
         }
+    }
+
+    /**
+     * Calculate chance for corpse to remain based on death cause and monster type
+     */
+    calculateCorpseChance(monster, cause) {
+        let baseChance = 0.7; // Default 70% chance
+
+        // Death cause modifiers
+        switch (cause) {
+            case 'player':
+            case 'melee':
+                baseChance = 0.8; // Normal melee combat leaves corpses more often
+                break;
+            case 'thrown':
+                baseChance = 0.6; // Thrown objects can cause more damage
+                break;
+            case 'door':
+                baseChance = 0.4; // Door slams can crush bodies
+                break;
+            case 'DoT':
+                baseChance = 0.5; // Status effects can deteriorate the body
+                break;
+            default:
+                baseChance = 0.7;
+        }
+
+        // Monster type modifiers
+        const monsterType = monster.type || 'unknown';
+        
+        // Undead tend to crumble more easily
+        if (['skeleton', 'zombie', 'lich', 'wraith', 'specter'].includes(monsterType)) {
+            baseChance *= 0.6;
+        }
+        // Slimes and oozes rarely leave corpses
+        else if (['slime', 'ooze', 'jelly'].includes(monsterType)) {
+            baseChance *= 0.2;
+        }
+        // Constructs don't leave organic corpses
+        else if (['golem', 'automaton', 'construct'].includes(monsterType)) {
+            baseChance *= 0.1;
+        }
+        // Large creatures are harder to completely destroy
+        else if (['dragon', 'giant', 'troll', 'ogre'].includes(monsterType)) {
+            baseChance *= 1.3;
+        }
+        // Small creatures might be completely obliterated
+        else if (['rat', 'bat', 'newt', 'gecko'].includes(monsterType)) {
+            baseChance *= 0.7;
+        }
+
+        // Monster HP affects destruction chance (higher HP = more durable body)
+        const hpRatio = (monster.maxHp || 6) / 20; // Normalize around 20 HP
+        baseChance *= (0.7 + 0.3 * Math.min(2, hpRatio)); // 0.7x to 1.3x based on HP
+
+        return Math.max(0.05, Math.min(0.95, baseChance)); // Cap between 5% and 95%
     }
     
     dropProjectileAt(item, x, y) {
@@ -2625,7 +2697,23 @@ class Game {
                     this.player.gainExp(monster.expValue);
                     // Drop corpse for DoT deaths
                     if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
-                        this.itemManager.addCorpse(monster);
+                        const corpseChance = this.calculateCorpseChance(monster, 'DoT');
+                        if (Math.random() < corpseChance) {
+                            this.itemManager.addCorpse(monster);
+                            if (this.renderer && this.isTileVisible(monster.x, monster.y)) {
+                                this.renderer.addBattleLogMessage('A corpse remains.', 'normal');
+                            }
+                        } else {
+                            if (this.renderer && this.isTileVisible(monster.x, monster.y)) {
+                                const destroyMessages = [
+                                    'The body withers away completely.',
+                                    'The wounds prove too severe.',
+                                    'Nothing remains but stains.',
+                                    'The carcass crumbles to nothing.'
+                                ];
+                                this.renderer.addBattleLogMessage(destroyMessages[Math.floor(Math.random() * destroyMessages.length)], 'normal');
+                            }
+                        }
                     }
                     // Blood spill on death (off-screen too)
                     if (this.dungeon && typeof this.dungeon.addBlood === 'function') {
