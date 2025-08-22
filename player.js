@@ -2787,4 +2787,25 @@ class Player {
         // Cap at 95% to avoid complete immunity
         return Math.min(totalResistance, 95);
     }
+    
+    /**
+     * Get effective sight range considering status effects
+     * @returns {number} Current sight range (1-15)
+     */
+    getEffectiveSightRange() {
+        let baseSightRange = 5; // Default sight range
+        
+        // Check for blood in eyes effect
+        if (this.statusEffects && this.statusEffects.hasEffect && this.statusEffects.hasEffect('blood_eyes')) {
+            const severity = this.statusEffects.getEffectSeverity('blood_eyes') || 1;
+            // Reduce sight range based on severity (1-3 tiles reduction)
+            const reduction = Math.min(3, severity);
+            baseSightRange = Math.max(1, baseSightRange - reduction);
+        }
+        
+        // Future: Add equipment bonuses (lantern, torch, etc.)
+        // Future: Add other status effects (darkness, blindness, etc.)
+        
+        return baseSightRange;
+    }
 } 

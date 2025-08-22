@@ -47,7 +47,7 @@ class StatusEffect {
             sleep: `Asleep (cannot act)`
         };
         if (this.type === 'blood_eyes') {
-            return `Eyes stung by blood (-${this.severity} to hit)`;
+            return `Eyes stung by blood (-${this.severity} to hit, vision impaired)`;
         }
         return descriptions[this.type] || this.type;
     }

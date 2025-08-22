@@ -1962,7 +1962,7 @@ class Game {
                             if (Math.random() < 0.25) {
                                 if (hitPlayer) {
                                     if (this.player.statusEffects) this.player.statusEffects.addEffect('blood_eyes', 2 + Math.floor(Math.random()*2), 1 + Math.floor(Math.random()*2), 'blood spatter');
-                                    if (this.renderer && this.isTileVisible(nx, ny)) this.renderer.addLogMessage('Blood splashes into your eyes!', 'warning');
+                                    if (this.renderer && this.isTileVisible(nx, ny)) this.renderer.addLogMessage('Blood splashes into your eyes, obscuring your vision!', 'warning');
                                 } else if (targetMonster && targetMonster.statusEffects) {
                                     targetMonster.statusEffects.addEffect('blood_eyes', 2 + Math.floor(Math.random()*2), 1 + Math.floor(Math.random()*2), 'blood spatter');
                                     if (this.renderer && this.isTileVisible(nx, ny)) this.renderer.addLogMessage(`Blood splashes into the ${targetMonster.name}'s eyes!`);
@@ -2548,6 +2548,10 @@ class Game {
      */
     updateFOV() {
         if (this.fov && this.player) {
+            // Update sight range based on status effects
+            const effectiveSightRange = this.player.getEffectiveSightRange();
+            this.fov.setViewRange(effectiveSightRange);
+            
             this.fov.calculateVisibility(this.player.x, this.player.y);
             
             // Update item visibility based on new FOV
