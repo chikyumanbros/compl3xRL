@@ -272,9 +272,10 @@ class Renderer {
                 const visibility = fov ? fov.getTileVisibility(monster.x, monster.y) : { visible: true };
                 
                 if (visibility.visible) {
-                    // Choose color based on sleep state
+                    // Choose color based on sleep state (check both natural sleep and status effect sleep)
                     let displayColor = monster.color;
-                    if (monster.isAsleep) {
+                    const isSleeping = monster.isAsleep || (monster.statusEffects && monster.statusEffects.hasEffect && monster.statusEffects.hasEffect('sleep'));
+                    if (isSleeping) {
                         // Sleeping monsters appear in darker/muted color
                         displayColor = 'monster_sleeping';
                     }
@@ -698,7 +699,8 @@ class Renderer {
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'monster-name';
                 let displayName = monster.name;
-                if (monster.isAsleep) {
+                const isSleeping = monster.isAsleep || (monster.statusEffects && monster.statusEffects.hasEffect && monster.statusEffects.hasEffect('sleep'));
+                if (isSleeping) {
                     displayName += ' (sleeping)';
                     nameSpan.style.color = '#888888'; // Dim color for sleeping monsters
                 }
