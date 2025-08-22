@@ -2765,4 +2765,26 @@ class Player {
         // Cap at 95% to avoid complete immunity
         return Math.min(totalResistance, 95);
     }
+    
+    /**
+     * Get total elemental resistance from all equipped items
+     * @param {string} elementType - The type of elemental damage (e.g., 'fire', 'cold', 'lightning')
+     * @returns {number} Total resistance percentage (0-100)
+     */
+    getElementalResistance(elementType) {
+        let totalResistance = 0;
+        
+        // Check all equipment slots for elemental resistances
+        const equipmentSlots = ['armor', 'helmet', 'gloves', 'boots', 'shield', 'ring1', 'ring2', 'amulet', 'weapon'];
+        
+        for (const slot of equipmentSlots) {
+            if (this.equipment[slot] && this.equipment[slot].elementalResistances) {
+                const resistance = this.equipment[slot].elementalResistances[elementType] || 0;
+                totalResistance += resistance;
+            }
+        }
+        
+        // Cap at 95% to avoid complete immunity
+        return Math.min(totalResistance, 95);
+    }
 } 

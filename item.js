@@ -126,6 +126,9 @@ class EquipmentItem extends Item {
         // Status effect resistances (Armor-specific)
         this.resistances = data.resistances || {}; // e.g., { bleeding: 20, stunned: 15 }
         
+        // Elemental damage resistances (Equipment-specific)
+        this.elementalResistances = data.elementalResistances || {}; // e.g., { fire: 25, cold: 10 }
+        
         // Enhancement level
         this.enchantment = data.enchantment || 0; // +1, +2, etc.
         
@@ -1340,6 +1343,10 @@ const EQUIPMENT_TYPES = {
                 stunned: 5,      // Rigid armor doesn't absorb impact well
                 fractured: 25    // Excellent bone protection
             },
+            elementalResistances: {
+                fire: 15,        // Steel provides some heat resistance
+                cold: 10         // Metal retains some body heat
+            },
             symbol: ']',
             color: '#DCDCDC',
             description: 'Plate mail. (AC -7, DR 4, Excellent Physical Resist)'
@@ -1712,6 +1719,11 @@ const EQUIPMENT_TYPES = {
                 poisoned: 20,
                 fractured: 15
             },
+            elementalResistances: {
+                fire: 30,        // Mithril legendary fire resistance
+                lightning: 25,   // Conducts but resists
+                acid: 40         // Highly resistant to corrosion
+            },
             symbol: '=',
             color: '#B0E0E6',
             description: 'Ring of resilience. (Excellent Physical Resists)'
@@ -1796,6 +1808,10 @@ const EQUIPMENT_TYPES = {
                 bleeding: 25,
                 poisoned: 30,
                 fractured: 20
+            },
+            elementalResistances: {
+                fire: 50,        // Ruby's fire affinity
+                lightning: 15    // Minor electrical resistance
             },
             symbol: '"',
             color: '#DC143C',

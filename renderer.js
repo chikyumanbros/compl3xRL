@@ -399,10 +399,11 @@ class Renderer {
             
             // Display total resistances
             if (player.getStatusResistance) {
-                const resistances = [];
-                const effectTypes = ['bleeding', 'stunned', 'fractured', 'poisoned', 'confused', 'paralyzed'];
+                const statusResistances = [];
+                const statusTypes = ['bleeding', 'stunned', 'fractured', 'poisoned', 'confused', 'paralyzed'];
                 
-                for (const type of effectTypes) {
+                // Check status effect resistances
+                for (const type of statusTypes) {
                     const resistance = player.getStatusResistance(type);
                     if (resistance > 0) {
                         const shortNames = {
@@ -413,24 +414,47 @@ class Renderer {
                             'confused': 'Cnf',
                             'paralyzed': 'Par'
                         };
-                        resistances.push(`${shortNames[type]}:${resistance}%`);
+                        statusResistances.push(`${shortNames[type]}:${resistance}%`);
                     }
                 }
                 
-                // Display resistances in a dedicated element or after encumbrance
-                if (resistances.length > 0) {
-                    const resistText = 'Resist: ' + resistances.join(' ');
-                    // Try to find or create a resistance display element
-                    let resistElement = document.getElementById('resistance-status');
-                    if (!resistElement) {
-                        // If it doesn't exist, update encumbrance element
+                // Check elemental resistances (if implemented)
+                const elementalResistances = [];
+                if (player.getElementalResistance) {
+                    const elementTypes = ['fire', 'cold', 'lightning', 'acid', 'poison_damage'];
+                    for (const type of elementTypes) {
+                        const resistance = player.getElementalResistance(type);
+                        if (resistance > 0) {
+                            const shortNames = {
+                                'fire': 'Fire',
+                                'cold': 'Cold',
+                                'lightning': 'Elec',
+                                'acid': 'Acid',
+                                'poison_damage': 'Psn'
+                            };
+                            elementalResistances.push(`${shortNames[type]}:${resistance}%`);
+                        }
+                    }
+                }
+                
+                // Display all resistances in dedicated element
+                const resistElement = document.getElementById('resistance-status');
+                if (resistElement) {
+                    const allResistances = [...statusResistances, ...elementalResistances];
+                    if (allResistances.length > 0) {
+                        resistElement.textContent = `Resist: ${allResistances.join(' ')}`;
+                    } else {
+                        resistElement.textContent = 'Resistances: None';
+                    }
+                } else {
+                    // Fallback to encumbrance element if resistance element doesn't exist
+                    if (statusResistances.length > 0) {
+                        const resistText = 'Resist: ' + statusResistances.join(' ');
                         const encumbranceElement = document.getElementById('encumbrance-status');
                         if (encumbranceElement) {
                             const baseText = stats.encumbranceLevel || '';
                             encumbranceElement.textContent = baseText ? `${baseText} | ${resistText}` : resistText;
                         }
-                    } else {
-                        resistElement.textContent = resistText;
                     }
                 }
             }

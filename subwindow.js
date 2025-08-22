@@ -534,7 +534,24 @@ class SubWindow {
                 const effectName = effectNames[effect] || effect;
                 resistanceList.push(`${effectName} ${value}%`);
             }
-            properties.push(`Resistances: ${resistanceList.join(', ')}`);
+            properties.push(`Status Resist: ${resistanceList.join(', ')}`);
+        }
+        
+        // Elemental resistances
+        if (item.elementalResistances && Object.keys(item.elementalResistances).length > 0) {
+            const elementalList = [];
+            for (const [element, value] of Object.entries(item.elementalResistances)) {
+                const elementNames = {
+                    'fire': 'Fire',
+                    'cold': 'Cold',
+                    'lightning': 'Lightning',
+                    'acid': 'Acid',
+                    'poison_damage': 'Poison'
+                };
+                const elementName = elementNames[element] || element;
+                elementalList.push(`${elementName} ${value}%`);
+            }
+            properties.push(`Element Resist: ${elementalList.join(', ')}`);
         }
         
         propsDiv.innerHTML = properties.join('<br>');
