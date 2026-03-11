@@ -313,6 +313,11 @@ class Game {
                     this.renderer.addLogMessage(message);
                 }
             }
+            // Player may have died from DoT (bleeding, poison, etc.)
+            if (this.player.hp <= 0) {
+                this.gameOver();
+                return;
+            }
         }
         
         // Update field of vision after player moves
@@ -539,8 +544,15 @@ class Game {
                 monster.lastSeenPlayerY = null;
                 monster.turnsWithoutSeeingPlayer = 0;
                 
-                // Awake monsters patrol their area (classic roguelike behavior)
-                this.performMonsterPatrol(monster);
+                // Corpses and blood attract monsters (scent range similar to noise, but wider)
+                const attractionRange = 15; // Wider than max noise (10) so scent carries far
+                const attraction = this.findNearestCorpseOrBlood(monster, attractionRange);
+                if (attraction && Math.random() < this.getMonsterAttractionChance(monster)) {
+                    this.moveMonsterTowards(monster, attraction.x, attraction.y);
+                } else {
+                    // Awake monsters patrol their area (classic roguelike behavior)
+                    this.performMonsterPatrol(monster);
+                }
             }
         }
     }
@@ -1044,6 +1056,79 @@ class Game {
     }
     
     /**
+     * Find nearest tile with corpse or significant blood (for attraction / scavenging)
+     * @param {Monster} monster
+     * @param {number} maxRange - max Chebyshev distance to search (default 15, wider than noise)
+     * @returns {{ x: number, y: number } | null}
+     */
+    findNearestCorpseOrBlood(monster, maxRange = 15) {
+        if (!this.dungeon || !this.itemManager) return null;
+        let best = null;
+        let bestDist = maxRange + 1;
+        const mx = monster.x;
+        const my = monster.y;
+        for (let dy = -maxRange; dy <= maxRange; dy++) {
+            for (let dx = -maxRange; dx <= maxRange; dx++) {
+                const dist = Math.max(Math.abs(dx), Math.abs(dy));
+                if (dist > maxRange || dist === 0) continue;
+                const tx = mx + dx;
+                const ty = my + dy;
+                if (!this.dungeon.isInBounds(tx, ty) || !this.dungeon.isWalkable(tx, ty)) continue;
+                if (this.monsterSpawner.getMonsterAt(tx, ty) || (tx === this.player.x && ty === this.player.y)) continue;
+                let attractive = false;
+                const items = this.itemManager.getItemsAt(tx, ty);
+                if (items.some(item => item.type === 'corpse')) attractive = true;
+                const tile = this.dungeon.getTile(tx, ty);
+                const blood = typeof tile.blood === 'number' ? tile.blood : 0;
+                if (blood >= 2) attractive = true;
+                if (attractive && dist < bestDist) {
+                    bestDist = dist;
+                    best = { x: tx, y: ty };
+                }
+            }
+        }
+        // Player carrying a corpse attracts monsters (scent of death)
+        if (this.player && this.playerHasCorpse()) {
+            const px = this.player.x;
+            const py = this.player.y;
+            const pdist = Math.max(Math.abs(px - mx), Math.abs(py - my));
+            if (pdist <= maxRange && pdist < bestDist) {
+                best = { x: px, y: py };
+                bestDist = pdist;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * True if the player has at least one corpse in inventory
+     */
+    playerHasCorpse() {
+        if (!this.player || !Array.isArray(this.player.inventory)) return false;
+        return this.player.inventory.some(item => item && item.type === 'corpse');
+    }
+
+    /**
+     * Probability that a monster is attracted to corpse/blood when not chasing player
+     */
+    getMonsterAttractionChance(monster) {
+        switch (monster.intelligence) {
+            case 'mindless':
+                return 0.15; // Slimes, etc. slightly drawn to blood
+            case 'animal':
+                return 0.6;  // Wolves, jackals, etc. strongly attracted
+            case 'normal':
+                return 0.4;  // Humanoids may scavenge
+            case 'smart':
+                return 0.3;
+            case 'genius':
+                return 0.2;
+            default:
+                return 0.35;
+        }
+    }
+
+    /**
      * Find which room a monster is currently in
      */
     findMonsterRoom(monster) {
@@ -1134,6 +1219,10 @@ class Game {
         this.renderer.addLogMessage('=== GAME OVER ===');
         this.renderer.addLogMessage(`You explored for ${this.player.turnCount} turns.`);
         this.renderer.addLogMessage('Press Enter to restart.');
+        // Redraw so HP and stats show final state (fixes display when dying from bleeding/DoT)
+        if (this.player && this.renderer) {
+            this.render();
+        }
     }
     
     /**

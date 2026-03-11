@@ -2390,12 +2390,11 @@ class Player {
     getEffectiveSightRange() {
         let baseSightRange = 5; // Default sight range
         
-        // Check for blood in eyes effect
+        // Check for blood in eyes effect (vision severely impaired)
         if (this.statusEffects && this.statusEffects.hasEffect && this.statusEffects.hasEffect('blood_eyes')) {
             const severity = this.statusEffects.getEffectSeverity('blood_eyes') || 1;
-            // Reduce sight range based on severity (1-3 tiles reduction)
-            const reduction = Math.min(3, severity);
-            baseSightRange = Math.max(1, baseSightRange - reduction);
+            // Extreme reduction: at most 1–2 tiles (adjacent only when severity >= 2)
+            baseSightRange = Math.max(1, 3 - severity);
         }
         
         // Future: Add equipment bonuses (lantern, torch, etc.)
