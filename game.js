@@ -486,15 +486,17 @@ class Game {
 
             const w = Math.max(0.2, Number(foodItem.weight || 0.5));
             if (typeof foodItem.miasmaBudget !== 'number') {
-                // Food emits less total miasma than corpses; scales with weight
-                // Reduce rotten food miasma output
-                foodItem.miasmaBudget = Math.max(1, Math.floor(w * 2));
+                // Ground: more emission. Carried: much less so it doesn't flood the tile.
+                const baseBudget = carried ? Math.max(1, Math.floor(w * 0.5)) : Math.max(1, Math.floor(w * 2));
+                foodItem.miasmaBudget = baseBudget;
                 foodItem.miasmaEmittedTotal = 0;
             }
             if (foodItem.miasmaBudget <= 0) return;
 
-            // Light intermittent emission
-            const emitChance = Math.min(0.40, 0.10 + Math.min(0.25, w * 0.10));
+            // Carried rotten food: low chance so it doesn't pile up
+            const emitChance = carried
+                ? Math.min(0.08, 0.02 + w * 0.02)
+                : Math.min(0.40, 0.10 + Math.min(0.25, w * 0.10));
             if (Math.random() > emitChance) return;
 
             const emitAmount = 1;
@@ -526,7 +528,7 @@ class Game {
                 emitFromFood(item, item.x, item.y, { carried: false });
             }
         }
-        // Carried food (emit at player position)
+        // Carried rotten food: emits a small amount at player position (reduced rate/budget)
         if (this.player && Array.isArray(this.player.inventory)) {
             for (const item of this.player.inventory) {
                 if (!item || item.type !== 'food') continue;
