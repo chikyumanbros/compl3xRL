@@ -399,6 +399,19 @@ body {
 .gas_miasma_mid  { color: #ddbfff; background-color: rgba(120, 40, 180, 0.34); text-shadow: 0 0 6px rgba(180, 120, 255, 0.35); }
 .gas_miasma_high { color: #f0e3ff; background-color: rgba(120, 40, 180, 0.46); text-shadow: 0 0 8px rgba(200, 150, 255, 0.50); font-weight: bold; }
 
+.gas_fire_low  { color: #ffd27a; background-color: rgba(255, 120, 0, 0.22); text-shadow: 0 0 4px rgba(255, 160, 60, 0.30); }
+.gas_fire_mid  { color: #ffe3a3; background-color: rgba(255, 120, 0, 0.34); text-shadow: 0 0 6px rgba(255, 180, 90, 0.42); }
+.gas_fire_high { color: #fff2d6; background-color: rgba(255, 120, 0, 0.48); text-shadow: 0 0 10px rgba(255, 220, 150, 0.65); font-weight: bold; }
+
+.gas_steam_low  { color: #ffffff; background-color: rgba(120, 200, 255, 0.18); text-shadow: 0 0 3px rgba(160, 220, 255, 0.22); }
+.gas_steam_mid  { color: #ffffff; background-color: rgba(120, 200, 255, 0.28); text-shadow: 0 0 5px rgba(180, 235, 255, 0.35); }
+.gas_steam_high { color: #ffffff; background-color: rgba(120, 200, 255, 0.38); text-shadow: 0 0 8px rgba(220, 250, 255, 0.55); font-weight: bold; }
+
+/* Steam over fire: make steam obvious even when fire is present */
+.gas_steam_fire_low  { color: #ffffff; background-color: rgba(200, 240, 255, 0.32); text-shadow: 0 0 4px rgba(230, 250, 255, 0.55); }
+.gas_steam_fire_mid  { color: #ffffff; background-color: rgba(200, 240, 255, 0.45); text-shadow: 0 0 6px rgba(230, 250, 255, 0.70); font-weight: bold; }
+.gas_steam_fire_high { color: #ffffff; background-color: rgba(210, 245, 255, 0.58); text-shadow: 0 0 10px rgba(240, 255, 255, 0.85); font-weight: bold; }
+
 /* Memory/explored but not visible colors */
 .wall_memory { color: #404040; }
 .floor_memory { color: #202020; }

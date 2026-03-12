@@ -521,6 +521,7 @@ class EquipmentItem extends Item {
             'critical': 2.0,     // Critical hits cause more wear
             'block': 1.5,        // Blocking puts stress on equipment
             'fumble': 3.0,       // Fumbling damages equipment more
+            'fire': 2.25,        // Heat/smoldering rapidly degrades materials
             // Thrown usage variants
             'thrown_hit': 1.25,   // Impact on a target
             'thrown_impact': 1.10, // Landing impact on the ground

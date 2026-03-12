@@ -193,27 +193,50 @@ class Renderer {
                                 else color = 'floor';
                             } else {
                                 char = this.symbols.floor;
-                                // Blood overlay when visible (3 levels) or dried stain
-                                const wet = tile.blood || 0;
-                                const stain = tile.bloodStain || 0;
-                                if (visibility.visible && (wet > 0 || stain > 0)) {
-                                    const level = wet > 0 ? wet : Math.ceil(stain / 3); // dried stain appears lighter
-                                    if (level >= 7) color = 'blood_high';
-                                    else if (level >= 3) color = 'blood_mid';
-                                    else color = 'blood_low';
-                                } else if (visibility.visible && tile.liquids && Object.keys(tile.liquids).length > 0) {
-                                    // Generic liquids: tint color by dominant type
-                                    const types = Object.entries(tile.liquids).sort((a,b)=>b[1]-a[1]);
-                                    const main = types[0]?.[0];
-                                    if (main === 'potion') color = 'potion_spill';
-                                    else color = 'blood_mid';
-                                } else if (visibility.visible && tile.gases && (tile.gases.miasma || 0) > 0) {
+                                // Gas overlays (priority: steam > fire > miasma)
+                                // NOTE: must be evaluated before liquids/blood, otherwise steam is hidden.
+                                if (visibility.visible && tile.gases && ((tile.gases.fire || 0) > 0 || (tile.gases.steam || 0) > 0 || (tile.gases.miasma || 0) > 0)) {
+                                    const f = tile.gases.fire || 0;
+                                    const s = tile.gases.steam || 0;
                                     const g = tile.gases.miasma || 0;
-                                    if (g >= 7) color = 'gas_miasma_high';
-                                    else if (g >= 3) color = 'gas_miasma_mid';
-                                    else color = 'gas_miasma_low';
+                                    if (s > 0) {
+                                        // If steam and fire coexist, use a more obvious composite tint
+                                        if (f > 0) {
+                                            if (s >= 7) color = 'gas_steam_fire_high';
+                                            else if (s >= 3) color = 'gas_steam_fire_mid';
+                                            else color = 'gas_steam_fire_low';
+                                        } else {
+                                            if (s >= 7) color = 'gas_steam_high';
+                                            else if (s >= 3) color = 'gas_steam_mid';
+                                            else color = 'gas_steam_low';
+                                        }
+                                    } else if (f > 0) {
+                                        if (f >= 7) color = 'gas_fire_high';
+                                        else if (f >= 3) color = 'gas_fire_mid';
+                                        else color = 'gas_fire_low';
+                                    } else {
+                                        if (g >= 7) color = 'gas_miasma_high';
+                                        else if (g >= 3) color = 'gas_miasma_mid';
+                                        else color = 'gas_miasma_low';
+                                    }
                                 } else {
-                                    color = visibility.visible ? 'floor' : 'floor_memory';
+                                    // Blood overlay when visible (3 levels) or dried stain
+                                    const wet = tile.blood || 0;
+                                    const stain = tile.bloodStain || 0;
+                                    if (visibility.visible && (wet > 0 || stain > 0)) {
+                                        const level = wet > 0 ? wet : Math.ceil(stain / 3); // dried stain appears lighter
+                                        if (level >= 7) color = 'blood_high';
+                                        else if (level >= 3) color = 'blood_mid';
+                                        else color = 'blood_low';
+                                    } else if (visibility.visible && tile.liquids && Object.keys(tile.liquids).length > 0) {
+                                        // Generic liquids: tint color by dominant type
+                                        const types = Object.entries(tile.liquids).sort((a,b)=>b[1]-a[1]);
+                                        const main = types[0]?.[0];
+                                        if (main === 'potion') color = 'potion_spill';
+                                        else color = 'blood_mid';
+                                    } else {
+                                        color = visibility.visible ? 'floor' : 'floor_memory';
+                                    }
                                 }
                             }
                             break;

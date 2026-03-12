@@ -9,6 +9,22 @@ const Gases = (function() {
             decayChance: 0.12,
             diffusionChance: 0.35,
             diffusionThreshold: 2
+        },
+        fire: {
+            // "Fire" is modeled as a gas-like overlay for rendering + decay,
+            // while actual ignition/explosion logic is handled by Game.
+            max: 10,
+            decayChance: 0.22,
+            diffusionChance: 0.10,
+            diffusionThreshold: 2
+        },
+        steam: {
+            // Steam is generated when fire is suppressed by liquids.
+            // It diffuses more than fire and decays relatively quickly.
+            max: 10,
+            decayChance: 0.25,
+            diffusionChance: 0.28,
+            diffusionThreshold: 2
         }
         // Future: poison, smoke, etc.
     };

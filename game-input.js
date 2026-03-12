@@ -21,7 +21,7 @@
                  // Prevent default behavior for game keys
         document.addEventListener('keydown', (event) => {
             const gameKeys = ['KeyH', 'KeyJ', 'KeyK', 'KeyL', 'KeyY', 'KeyU', 'KeyB', 'KeyN', 
-                             'Period', 'KeyQ', 'Escape'];
+                             'Period', 'KeyQ', 'Escape', 'KeyF'];
             if (gameKeys.includes(event.code)) {
                 event.preventDefault();
             }
@@ -57,6 +57,35 @@
         // selection can be a letter (inventory) or { equipSlot: 'weapon'|'shield' }
         this.awaitingThrowDirection = typeof selection === 'string' ? { letter: selection } : selection;
         if (this.renderer) this.renderer.addLogMessage('Throw in which direction?');
+    };
+
+    GameRef.prototype.beginIgniteDirectionSelection = function() {
+        this.awaitingIgniteDirection = true;
+        if (this.renderer) this.renderer.addLogMessage('Ignite in which direction?');
+    };
+
+    GameRef.prototype.finishIgniteWithDirection = function(dx, dy) {
+        this.awaitingIgniteDirection = false;
+        if (!this.player || !this.dungeon) return;
+        const tx = this.player.x + Math.sign(dx);
+        const ty = this.player.y + Math.sign(dy);
+        if (!this.dungeon.isInBounds(tx, ty)) {
+            if (this.renderer) this.renderer.addLogMessage('Nothing happens.');
+            return;
+        }
+        const t = this.dungeon.getTile(tx, ty);
+        if (!t || t.type === 'wall' || (t.type === 'door' && t.doorState !== 'open')) {
+            if (this.renderer) this.renderer.addLogMessage('You cannot ignite that.');
+            return;
+        }
+        if (typeof this.dungeon.addGas === 'function') {
+            // Direct ignition starts at minimum fire level
+            this.dungeon.addGas(tx, ty, 'fire', 1);
+        }
+        if (this.renderer && this.isTileVisible(tx, ty)) {
+            this.renderer.addLogMessage('You start a fire.');
+        }
+        this.postPlayerAction();
     };
 
     GameRef.prototype.finishThrowWithDirection = function(dx, dy) {
@@ -551,6 +580,20 @@
                 return;
             }
         }
+        // If awaiting ignite direction, intercept direction keys
+        if (this.awaitingIgniteDirection) {
+            const dir = this.getDirectionFromKey(event);
+            if (dir) {
+                event.preventDefault();
+                this.finishIgniteWithDirection(dir.dx, dir.dy);
+                return;
+            }
+            if (event.code === 'Escape') {
+                this.awaitingIgniteDirection = false;
+                if (this.renderer) this.renderer.addLogMessage('Ignite cancelled.');
+                return;
+            }
+        }
         // If awaiting disarm direction, read one step direction and disarm there
         if (this.awaitingDisarmDirection) {
             const dir = this.getDirectionFromKey(event);
@@ -713,6 +756,13 @@
                     // Drop item - lowercase d
                     event.preventDefault();
                     this.dropItem();
+                }
+                break;
+            case 'KeyF':
+                // Shift+F: Ignite fire in a direction
+                if (event.shiftKey) {
+                    event.preventDefault();
+                    this.beginIgniteDirectionSelection();
                 }
                 break;
             case 'KeyI':
