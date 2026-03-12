@@ -1809,12 +1809,15 @@ class Player {
             return false;
         }
         
-        // Check if it's rotten (for FoodItem class)
-        if (foodItem instanceof FoodItem && !foodItem.isEdible()) {
-            if (window.game && window.game.renderer) {
-                window.game.renderer.addLogMessage('That food is rotten!');
+        // Check if it's rotten (for FoodItem class) - now allowed, but dangerous
+        let foodFreshness = 100;
+        if (foodItem instanceof FoodItem) {
+            foodFreshness = typeof foodItem.freshness === 'number' ? foodItem.freshness : 100;
+            if (!foodItem.isEdible()) {
+                if (window.game && window.game.renderer) {
+                    window.game.renderer.addLogMessage('That food is rotten! You may regret eating it...', 'warning');
+                }
             }
-            return false;
         }
         
         // Check overeating conditions (ADOM-style)
@@ -1875,6 +1878,37 @@ class Player {
             const healedAmount = this.heal(foodItem.healAmount);
             if (window.game && window.game.renderer) {
                 window.game.renderer.addBattleLogMessage(`The ${foodItem.name} heals you for ${healedAmount} HP!`, 'heal');
+            }
+        }
+
+        // Rotten/aging food penalties: random status effects and discomfort scaling with腐敗度
+        if (foodItem instanceof FoodItem && this.statusEffects) {
+            const f = Math.max(0, Math.min(100, foodFreshness));
+            const rot = 100 - f; // 0 = fresh, 100 = completely rotten
+            if (rot > 0) {
+                const rotFactor = rot / 100;
+                // Base chance: very low when slightly old, high when nearly rotten
+                const baseChance = 0.15 * rotFactor + 0.45 * rotFactor * rotFactor; // ~0〜0.6
+                if (Math.random() < baseChance) {
+                    const effects = [
+                        { type: 'poisoned', weight: 3 },
+                        { type: 'stunned', weight: 2 },
+                        { type: 'confused', weight: 2 }
+                    ];
+                    const totalWeight = effects.reduce((sum, e) => sum + e.weight, 0);
+                    let pick = Math.random() * totalWeight;
+                    let chosen = effects[0];
+                    for (const e of effects) {
+                        if (pick < e.weight) { chosen = e; break; }
+                        pick -= e.weight;
+                    }
+                    const severity = 1 + (rot > 60 ? 1 : 0);
+                    const duration = 2 + Math.floor(rotFactor * 4); // 2〜6ターン程度
+                    this.statusEffects.addEffect(chosen.type, duration, severity, 'rotten food');
+                    if (window.game && window.game.renderer) {
+                        window.game.renderer.addLogMessage('You feel sick after eating that...', 'damage');
+                    }
+                }
             }
         }
         

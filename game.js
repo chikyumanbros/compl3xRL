@@ -857,7 +857,8 @@ class Game {
                 }
                 const totalWet = bloodWet + otherWet;
                 if (totalWet > 0) {
-                    const suppress = Math.max(1, Math.min(5, 1 + Math.floor(totalWet / 4)));
+                    // Stronger suppression: even shallow liquids/blood quickly quench fire
+                    const suppress = Math.max(1, Math.min(7, 2 + Math.floor(totalWet / 3)));
                     const nextFire = Math.max(0, fireLevel - suppress);
                     setGas(x, y, 'fire', nextFire);
                     fireLevel = nextFire;
@@ -2583,7 +2584,135 @@ class Game {
             return false;
         }
     }
-    
+
+    /**
+     * Build list of bury targets: corpses/items/liquids on current tile + inventory.
+     * Stored in this._lastBuryOptions for executeBuryChoice.
+     */
+    getBuryOptions() {
+        const options = [];
+        if (!this.itemManager || !this.player) return options;
+        const x = this.player.x;
+        const y = this.player.y;
+        const itemsAt = this.itemManager.getItemsAt(x, y) || [];
+        const corpses = itemsAt.filter(it => it && it.type === 'corpse');
+        const floorItems = itemsAt.filter(it => it && it.type !== 'corpse');
+        let keyNum = 1;
+        if (corpses.length > 0) {
+            options.push({ key: String(keyNum++), label: corpses.length === 1 ? 'Bury corpse here' : `Bury ${corpses.length} corpses here`, actionType: 'corpses' });
+        }
+        let hasLiquids = false;
+        if (this.dungeon) {
+            const t = this.dungeon.getTile(x, y);
+            if ((typeof t.blood === 'number' && t.blood > 0) || (t.liquids && Object.keys(t.liquids).length > 0)) {
+                hasLiquids = true;
+            }
+        }
+        if (hasLiquids) {
+            options.push({ key: String(keyNum++), label: 'Cover liquids here', actionType: 'liquids' });
+        }
+        floorItems.forEach((item) => {
+            const name = item.getDisplayName ? item.getDisplayName() : item.name;
+            options.push({ key: String(keyNum++), label: `Bury item: ${name}`, actionType: 'item', item });
+        });
+        const invSummary = this.player.getInventorySummary ? this.player.getInventorySummary() : [];
+        invSummary.forEach((line) => {
+            const letter = line.charAt(0).toLowerCase();
+            options.push({ key: letter, label: line, actionType: 'inventory', letter });
+        });
+        this._lastBuryOptions = options;
+        return options;
+    }
+
+    /**
+     * Execute a bury action chosen from the menu (key from getBuryOptions).
+     */
+    executeBuryChoice(key) {
+        const opt = (this._lastBuryOptions || []).find(o => o.key === key);
+        if (!opt) return false;
+        const x = this.player.x;
+        const y = this.player.y;
+        if (opt.actionType === 'corpses') return this.buryCorpsesAt(x, y);
+        if (opt.actionType === 'liquids') return this.coverLiquidsAt(x, y);
+        if (opt.actionType === 'item') return this.buryItemOnGround(opt.item);
+        if (opt.actionType === 'inventory') return this.buryItemFromInventory(opt.letter);
+        return false;
+    }
+
+    /** Bury all corpses at (x,y). */
+    buryCorpsesAt(x, y) {
+        const itemsAt = this.itemManager.getItemsAt(x, y) || [];
+        const corpses = itemsAt.filter(it => it && it.type === 'corpse');
+        if (corpses.length === 0) return false;
+        for (const c of corpses) {
+            this.itemManager.removeItem(c);
+        }
+        if (this.dungeon) {
+            const t = this.dungeon.getTile(x, y);
+            if (t && typeof t.blood === 'number') {
+                t.blood = Math.max(0, t.blood - 2);
+            }
+        }
+        if (this.renderer && this.isTileVisible(x, y)) {
+            this.renderer.addLogMessage(corpses.length === 1 ? 'You bury the corpse.' : 'You bury the corpses here.');
+        }
+        this.player.turnCount++;
+        this.player.checkRegeneration();
+        return true;
+    }
+
+    /** Remove one item from the floor (bury/discard). */
+    buryItemOnGround(item) {
+        if (!item || !this.itemManager) return false;
+        this.itemManager.removeItem(item);
+        if (this.renderer) {
+            this.renderer.addLogMessage(`You bury the ${item.getDisplayName ? item.getDisplayName() : item.name}.`);
+        }
+        this.player.turnCount++;
+        this.player.checkRegeneration();
+        return true;
+    }
+
+    /** Reduce blood and clear liquids on the tile. */
+    coverLiquidsAt(x, y) {
+        if (!this.dungeon) return false;
+        const t = this.dungeon.getTile(x, y);
+        let changed = false;
+        if (typeof t.blood === 'number' && t.blood > 0) {
+            t.blood = 0;
+            if (t.bloodStain !== undefined) t.bloodStain = Math.max(0, (t.bloodStain || 0) - 2);
+            changed = true;
+        }
+        if (t.liquids && Object.keys(t.liquids).length > 0) {
+            t.liquids = {};
+            changed = true;
+        }
+        if (!changed) return false;
+        if (this.renderer && this.isTileVisible(x, y)) {
+            this.renderer.addLogMessage('You cover the liquids with dirt.');
+        }
+        this.player.turnCount++;
+        this.player.checkRegeneration();
+        return true;
+    }
+
+    /** Bury (discard) one item from inventory by letter. */
+    buryItemFromInventory(letter) {
+        if (!this.player) return false;
+        const idx = letter.toLowerCase().charCodeAt(0) - 97;
+        if (idx < 0 || idx >= this.player.inventory.length) return false;
+        const item = this.player.inventory[idx];
+        const name = item.getDisplayName ? item.getDisplayName() : item.name;
+        this.player.removeFromInventory(idx);
+        if (this.renderer) {
+            this.renderer.addLogMessage(`You bury the ${name} from your pack.`);
+        }
+        this.player.turnCount++;
+        this.player.checkRegeneration();
+        if (this.renderer) this.renderer.updateInventoryDisplay(this.player);
+        return true;
+    }
+
     /**
      * Drop item from inventory
      */

@@ -573,6 +573,10 @@ class Renderer {
         if (fov && window.game && window.game.itemManager) {
             this.updateNearbyItems(window.game.itemManager, fov, player.x, player.y);
         }
+        // Update nearby liquids and gases display
+        if (fov && window.game && window.game.dungeon) {
+            this.updateNearbyLiquidsAndGases(window.game.dungeon, fov, player.x, player.y);
+        }
     }
     
     /**
@@ -881,6 +885,82 @@ class Renderer {
                 itemDiv.appendChild(rightDiv);
                 
                 container.appendChild(itemDiv);
+            });
+        }
+    }
+    
+    /**
+     * Get visible tiles that have liquids (blood, tile.liquids) or gases (fire, steam, miasma) within FOV.
+     */
+    getNearbyLiquidsAndGases(dungeon, fov, playerX, playerY) {
+        if (!fov || !dungeon) return [];
+        const results = [];
+        const liquidLabels = { blood: 'Blood', potion: 'Potion', water: 'Water' };
+        const gasLabels = { fire: 'Fire', steam: 'Steam', miasma: 'Miasma' };
+        for (let y = 0; y < dungeon.height; y++) {
+            for (let x = 0; x < dungeon.width; x++) {
+                const visibility = fov.getTileVisibility(x, y);
+                if (!visibility.visible) continue;
+                const tile = dungeon.getTile(x, y);
+                const dx = x - playerX;
+                const dy = y - playerY;
+                const distance = Math.floor(Math.sqrt(dx * dx + dy * dy));
+                const direction = this.calculateDirection(dx, dy);
+                const directionText = this.formatDirection(direction, distance);
+                if (typeof tile.blood === 'number' && tile.blood > 0) {
+                    results.push({ label: 'Blood', amount: tile.blood, directionText, distance, kind: 'liquid' });
+                }
+                if (tile.liquids && Object.keys(tile.liquids).length > 0) {
+                    for (const [key, amount] of Object.entries(tile.liquids)) {
+                        if (amount > 0) {
+                            const label = liquidLabels[key] || (key.charAt(0).toUpperCase() + key.slice(1));
+                            results.push({ label, amount, directionText, distance, kind: 'liquid' });
+                        }
+                    }
+                }
+                if (tile.gases) {
+                    for (const [key, amount] of Object.entries(tile.gases)) {
+                        if (amount > 0) {
+                            const label = gasLabels[key] || (key.charAt(0).toUpperCase() + key.slice(1));
+                            results.push({ label, amount, directionText, distance, kind: 'gas' });
+                        }
+                    }
+                }
+            }
+        }
+        return results.sort((a, b) => a.distance - b.distance);
+    }
+    
+    /**
+     * Update nearby liquids and gases display in right panel.
+     */
+    updateNearbyLiquidsAndGases(dungeon, fov, playerX, playerY) {
+        const container = document.getElementById('nearby-liquids-gases-container');
+        if (!container) return;
+        const list = this.getNearbyLiquidsAndGases(dungeon, fov, playerX, playerY);
+        container.innerHTML = '';
+        if (list.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.textContent = 'None';
+            emptyDiv.style.color = '#888';
+            emptyDiv.style.fontStyle = 'italic';
+            container.appendChild(emptyDiv);
+        } else {
+            list.forEach(entry => {
+                const div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.justifyContent = 'space-between';
+                div.style.alignItems = 'center';
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = `${entry.label} (${entry.amount})`;
+                nameSpan.style.color = entry.kind === 'gas' ? '#ffcc88' : '#88ccff';
+                const dirSpan = document.createElement('span');
+                dirSpan.textContent = entry.directionText;
+                dirSpan.style.color = '#aaaaaa';
+                dirSpan.style.fontSize = '10px';
+                div.appendChild(nameSpan);
+                div.appendChild(dirSpan);
+                container.appendChild(div);
             });
         }
     }

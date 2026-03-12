@@ -41,7 +41,8 @@
                 }
                 var freshnessInfo = '';
                 if (typeof FoodItem !== 'undefined' && invItem instanceof FoodItem && invItem.perishable) {
-                    if (invItem.freshness >= 80) freshnessInfo = ' [fresh]';
+                    if (invItem.freshness <= 0) freshnessInfo = ' [rotten]';
+                    else if (invItem.freshness >= 80) freshnessInfo = ' [fresh]';
                     else if (invItem.freshness >= 50) freshnessInfo = ' [aging]';
                     else if (invItem.freshness >= 20) freshnessInfo = ' [stale]';
                     else freshnessInfo = ' [spoiling]';
@@ -300,6 +301,51 @@
                 window.game.renderer.addLogMessage('You couldn\'t pick up any items. Your pack might be full.');
             }
         }
+    };
+
+    SubWindow.prototype.showBuryMenu = function () {
+        if (!window.game || !window.game.getBuryOptions) return;
+        var options = window.game.getBuryOptions();
+        this.title.textContent = 'Bury (Shift+B) – choose target';
+        this.content.innerHTML = '';
+        this.input.style.display = 'flex';
+        this.textInput.placeholder = 'Enter key (1-9 or a-z) or Escape to cancel';
+        this.textInput.value = '';
+
+        if (options.length === 0) {
+            this.content.innerHTML = '<div style="color: #808080; font-style: italic;">Nothing to bury here or in inventory.</div>';
+            this.input.style.display = 'none';
+        } else {
+            options.forEach(function (opt) {
+                var itemDiv = document.createElement('div');
+                itemDiv.className = 'item-line';
+                itemDiv.textContent = opt.key + ') ' + opt.label;
+                this.content.appendChild(itemDiv);
+            }.bind(this));
+        }
+
+        var self = this;
+        this.callback = function (choice) {
+            if (!choice || choice.length === 0) return false;
+            var k = choice.trim().charAt(0);
+            var key = (k >= 'a' && k <= 'z') || (k >= 'A' && k <= 'Z') ? k.toLowerCase() : k;
+            var opt = options.find(function (o) { return o.key === key; });
+            if (!opt) {
+                if (window.game && window.game.renderer) {
+                    window.game.renderer.addLogMessage('Invalid choice.');
+                }
+                return false;
+            }
+            var success = window.game.executeBuryChoice(key);
+            if (success) {
+                window.game.processTurn();
+                window.game.render();
+            }
+            return true;
+        };
+
+        this.show();
+        this.textInput.focus();
     };
 
     SubWindow.prototype.showDropMenu = function (player) {

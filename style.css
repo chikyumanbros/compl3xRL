@@ -497,6 +497,44 @@ body {
     color: #cccccc;
 }
 
+/* Nearby liquids & gases */
+.nearby-liquids-gases {
+    background-color: #000;
+    border: 1px solid #808080;
+    padding: 6px;
+    margin: 0;
+    border-radius: 0;
+    flex-shrink: 0;
+    min-height: 80px;
+}
+
+.nearby-liquids-gases h3 {
+    color: #ffffff;
+    margin: 0;
+    font-size: 13px;
+    border-bottom: 1px solid #808080;
+    padding: 2px 4px;
+    background-color: #808080;
+    color: #000;
+    font-weight: bold;
+}
+
+#nearby-liquids-gases-container {
+    max-height: 100px;
+    overflow-y: auto;
+    font-size: 11px;
+    line-height: 1.2;
+    padding: 4px;
+}
+
+#nearby-liquids-gases-container div {
+    margin: 1px 0;
+    padding: 0 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 .monster-entry {
     margin-bottom: 2px;
     padding-bottom: 2px;

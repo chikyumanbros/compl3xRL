@@ -78,12 +78,35 @@
             if (this.renderer) this.renderer.addLogMessage('You cannot ignite that.');
             return;
         }
-        if (typeof this.dungeon.addGas === 'function') {
-            // Direct ignition starts at minimum fire level
-            this.dungeon.addGas(tx, ty, 'fire', 1);
+        const wetBlood = t.blood || 0;
+        let otherWet = 0;
+        if (t.liquids) {
+            for (const key of Object.keys(t.liquids)) {
+                otherWet += Math.max(0, Math.floor(t.liquids[key] || 0));
+            }
         }
-        if (this.renderer && this.isTileVisible(tx, ty)) {
-            this.renderer.addLogMessage('You start a fire.');
+        const totalWet = wetBlood + otherWet;
+
+        if (typeof this.dungeon.addGas === 'function') {
+            if (totalWet >= 3) {
+                // Very wet surface: fire is immediately quenched into steam only.
+                const steamAmount = Math.max(1, Math.min(6, 1 + Math.floor(totalWet / 2)));
+                this.dungeon.addGas(tx, ty, 'steam', steamAmount);
+                if (this.renderer && this.isTileVisible(tx, ty)) {
+                    this.renderer.addLogMessage('The wet surface hisses into steam, but does not catch fire.', 'normal');
+                }
+            } else {
+                // Slightly wet: small fire plus a bit of steam
+                this.dungeon.addGas(tx, ty, 'fire', 1);
+                if (totalWet > 0) {
+                    this.dungeon.addGas(tx, ty, 'steam', 1);
+                }
+                if (this.renderer && this.isTileVisible(tx, ty)) {
+                    this.renderer.addLogMessage('You start a fire.', 'normal');
+                }
+            }
+        } else if (this.renderer && this.isTileVisible(tx, ty)) {
+            this.renderer.addLogMessage('You start a fire.', 'normal');
         }
         this.postPlayerAction();
     };
@@ -715,6 +738,12 @@
             case 'KeyB':
                 if (!event.shiftKey) {
                     playerMoved = this.movePlayer(-1, 1);
+                } else {
+                    // Shift+B: Bury – open menu to choose target (corpses, items, liquids, inventory)
+                    event.preventDefault();
+                    if (window.subWindow) {
+                        window.subWindow.showBuryMenu();
+                    }
                 }
                 break;
             case 'KeyN':
