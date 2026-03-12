@@ -394,6 +394,11 @@ body {
 .blood_high { color: #ff0000; }
 .potion_spill { color: #66aaff; }
 
+/* Gas overlays (use background for translucency) */
+.gas_miasma_low  { color: #caa8ff; background-color: rgba(120, 40, 180, 0.22); text-shadow: 0 0 4px rgba(180, 120, 255, 0.25); }
+.gas_miasma_mid  { color: #ddbfff; background-color: rgba(120, 40, 180, 0.34); text-shadow: 0 0 6px rgba(180, 120, 255, 0.35); }
+.gas_miasma_high { color: #f0e3ff; background-color: rgba(120, 40, 180, 0.46); text-shadow: 0 0 8px rgba(200, 150, 255, 0.50); font-weight: bold; }
+
 /* Memory/explored but not visible colors */
 .wall_memory { color: #404040; }
 .floor_memory { color: #202020; }

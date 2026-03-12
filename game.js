@@ -332,10 +332,310 @@ class Game {
         if (this.dungeon && typeof this.dungeon.stepLiquids === 'function') {
             this.dungeon.stepLiquids();
         }
+        // Food aging (ground + inventory)
+        this.processFoodAging();
+        // Corpse decay -> gas emission
+        this.processCorpseMiasma();
+        // Blood/stains -> gas emission
+        this.processBloodMiasma();
+        // Rotten food -> gas emission
+        this.processFoodMiasma();
+        // World step: gas diffusion/decay
+        if (this.dungeon && typeof this.dungeon.stepGases === 'function') {
+            this.dungeon.stepGases();
+        }
+        // Miasma contact accelerates food spoilage (ground + inventory)
+        this.processMiasmaFoodRot();
         
         // Immediate autosave after every action
         if (this.autosaveEnabled && this.gameState === 'playing') {
             this.saveGame();
+        }
+    }
+
+    /**
+     * Age perishable foods each world step (ground + inventory).
+     * This enables "rotten food" to naturally appear over time.
+     */
+    processFoodAging() {
+        // Ground items
+        if (this.itemManager && typeof this.itemManager.processAging === 'function') {
+            this.itemManager.processAging();
+        }
+        // Inventory food aging (very slow, same as ground)
+        if (this.player && Array.isArray(this.player.inventory)) {
+            for (const item of this.player.inventory) {
+                if (!item) continue;
+                if (item.type === 'food' && item.perishable && typeof item.age === 'function') {
+                    item.age();
+                }
+            }
+        }
+    }
+
+    /**
+     * After a corpse has sat for some turns, it begins emitting miasma.
+     * Effects are intentionally not implemented yet; only generation + visualization.
+     */
+    processCorpseMiasma() {
+        if (!this.dungeon) return;
+        const TILE_CAP = 10;
+
+        const emitFromCorpse = (corpseItem, sx, sy, opts = {}) => {
+            const carried = !!opts.carried;
+            if (!corpseItem || corpseItem.type !== 'corpse') return;
+            const w = Math.max(1, Math.floor(corpseItem.weight || 5));
+
+            if (typeof corpseItem.rotTurns !== 'number') corpseItem.rotTurns = 0;
+            // Carried corpses rot faster (warmth, handling)
+            corpseItem.rotTurns += carried ? 2 : 1;
+
+            // Heavier corpses take longer to start but produce more total miasma
+            // IMPORTANT: keep the same start threshold whether carried or not.
+            // Carrying speeds up rot by increasing rotTurns, but should not cause
+            // a corpse that was "not yet emitting on the ground" to start emitting
+            // immediately just because it was picked up.
+            const startTurns = 10 + Math.floor(w * 2);
+            if (corpseItem.rotTurns < startTurns) return;
+            if (!corpseItem.miasmaEmitting) corpseItem.miasmaEmitting = true;
+
+            // Budget = how much total miasma this corpse can generate before disappearing
+            if (typeof corpseItem.miasmaBudget !== 'number') {
+                corpseItem.miasmaBudget = Math.max(3, Math.floor(w * 6));
+                corpseItem.miasmaEmittedTotal = 0;
+            }
+            if (corpseItem.miasmaBudget <= 0) return;
+
+            // Emission chance increases over time after start
+            const ageFactor = Math.min(1, (corpseItem.rotTurns - startTurns) / 40);
+            const emitChance = Math.min(0.9, 0.35 + ageFactor * 0.45);
+            if (Math.random() > emitChance) return;
+            if (!this.dungeon.isInBounds(sx, sy)) return;
+            const tile = this.dungeon.getTile(sx, sy);
+            if (!tile || tile.type !== 'floor') return;
+
+            const current = (tile.gases && tile.gases.miasma) ? tile.gases.miasma : 0;
+            if (current >= TILE_CAP) return;
+
+            const emitAmount = Math.max(1, Math.min(3, 1 + Math.floor(w / 10)));
+            const allowed = Math.max(0, Math.min(emitAmount, TILE_CAP - current, corpseItem.miasmaBudget));
+            if (allowed <= 0) return;
+
+            if (typeof this.dungeon.addGas === 'function') {
+                this.dungeon.addGas(sx, sy, 'miasma', allowed);
+                corpseItem.miasmaBudget -= allowed;
+                corpseItem.miasmaEmittedTotal = (corpseItem.miasmaEmittedTotal || 0) + allowed;
+            }
+
+            if (corpseItem.miasmaBudget <= 0) {
+                // Remove corpse: inventory or ground
+                if (carried && this.player && typeof this.player.removeItemFromInventory === 'function') {
+                    this.player.removeItemFromInventory(corpseItem);
+                } else if (carried && this.player && Array.isArray(this.player.inventory)) {
+                    const idx = this.player.inventory.indexOf(corpseItem);
+                    if (idx >= 0) this.player.inventory.splice(idx, 1);
+                } else if (this.itemManager && typeof this.itemManager.removeItem === 'function') {
+                    this.itemManager.removeItem(corpseItem);
+                }
+            }
+        };
+
+        // Ground corpses
+        if (this.itemManager && Array.isArray(this.itemManager.items)) {
+            for (const item of this.itemManager.items) {
+                if (!item || item.type !== 'corpse') continue;
+                emitFromCorpse(item, item.x, item.y, { carried: false });
+            }
+        }
+        // Carried corpses (emit at player position)
+        if (this.player && Array.isArray(this.player.inventory)) {
+            for (const item of this.player.inventory) {
+                if (!item || item.type !== 'corpse') continue;
+                emitFromCorpse(item, this.player.x, this.player.y, { carried: true });
+            }
+        }
+    }
+
+    /**
+     * Rotten/perishing food can emit a small amount of miasma (ground + inventory).
+     * Once a food's miasma budget is exhausted, it crumbles away.
+     */
+    processFoodMiasma() {
+        if (!this.dungeon) return;
+        const TILE_CAP = 10;
+
+        const emitFromFood = (foodItem, sx, sy, opts = {}) => {
+            const carried = !!opts.carried;
+            if (!foodItem || foodItem.type !== 'food' || !foodItem.perishable) return;
+            if (typeof foodItem.freshness !== 'number') return;
+            // Only rotten food emits (freshness == 0)
+            if (foodItem.freshness > 0) return;
+
+            if (!this.dungeon.isInBounds(sx, sy)) return;
+            const tile = this.dungeon.getTile(sx, sy);
+            if (!tile || tile.type !== 'floor') return;
+            const current = (tile.gases && tile.gases.miasma) ? tile.gases.miasma : 0;
+            if (current >= TILE_CAP) return;
+
+            const w = Math.max(0.2, Number(foodItem.weight || 0.5));
+            if (typeof foodItem.miasmaBudget !== 'number') {
+                // Food emits less total miasma than corpses; scales with weight
+                foodItem.miasmaBudget = Math.max(1, Math.floor(w * 4));
+                foodItem.miasmaEmittedTotal = 0;
+            }
+            if (foodItem.miasmaBudget <= 0) return;
+
+            // Light intermittent emission
+            const emitChance = Math.min(0.65, 0.25 + Math.min(0.4, w * 0.15));
+            if (Math.random() > emitChance) return;
+
+            const emitAmount = 1;
+            const allowed = Math.max(0, Math.min(emitAmount, TILE_CAP - current, foodItem.miasmaBudget));
+            if (allowed <= 0) return;
+
+            if (typeof this.dungeon.addGas === 'function') {
+                this.dungeon.addGas(sx, sy, 'miasma', allowed);
+                foodItem.miasmaBudget -= allowed;
+                foodItem.miasmaEmittedTotal = (foodItem.miasmaEmittedTotal || 0) + allowed;
+            }
+
+            if (foodItem.miasmaBudget <= 0) {
+                if (carried && this.player && typeof this.player.removeItemFromInventory === 'function') {
+                    this.player.removeItemFromInventory(foodItem);
+                } else if (carried && this.player && Array.isArray(this.player.inventory)) {
+                    const idx = this.player.inventory.indexOf(foodItem);
+                    if (idx >= 0) this.player.inventory.splice(idx, 1);
+                } else if (this.itemManager && typeof this.itemManager.removeItem === 'function') {
+                    this.itemManager.removeItem(foodItem);
+                }
+            }
+        };
+
+        // Ground food
+        if (this.itemManager && Array.isArray(this.itemManager.items)) {
+            for (const item of this.itemManager.items) {
+                if (!item || item.type !== 'food') continue;
+                emitFromFood(item, item.x, item.y, { carried: false });
+            }
+        }
+        // Carried food (emit at player position)
+        if (this.player && Array.isArray(this.player.inventory)) {
+            for (const item of this.player.inventory) {
+                if (!item || item.type !== 'food') continue;
+                emitFromFood(item, this.player.x, this.player.y, { carried: true });
+            }
+        }
+    }
+
+    /**
+     * When food touches miasma, it spoils faster.
+     * Applies to food in player's inventory (based on player's tile) and food on tiles.
+     */
+    processMiasmaFoodRot() {
+        if (!this.dungeon) return;
+        const getMiasma = (x, y) => {
+            if (!this.dungeon.isInBounds(x, y)) return 0;
+            const t = this.dungeon.getTile(x, y);
+            return (t && t.gases && t.gases.miasma) ? t.gases.miasma : 0;
+        };
+
+        // Inventory food: if player is standing in miasma
+        if (this.player && Array.isArray(this.player.inventory)) {
+            const m = getMiasma(this.player.x, this.player.y);
+            if (m > 0) {
+                for (const item of this.player.inventory) {
+                    if (!item || item.type !== 'food' || !item.perishable) continue;
+                    if (typeof item.freshness !== 'number' || item.freshness <= 0) continue;
+                    const w = Math.max(0.2, Number(item.weight || 0.5));
+                    const extra = (0.15 + 0.08 * m) / (0.6 + w); // heavier spoils a bit slower
+                    item.freshness = Math.max(0, item.freshness - extra);
+                }
+            }
+        }
+
+        // Ground food: if tile has miasma
+        if (this.itemManager && Array.isArray(this.itemManager.items)) {
+            for (const item of this.itemManager.items) {
+                if (!item || item.type !== 'food' || !item.perishable) continue;
+                if (typeof item.freshness !== 'number' || item.freshness <= 0) continue;
+                const m = getMiasma(item.x, item.y);
+                if (m <= 0) continue;
+                const w = Math.max(0.2, Number(item.weight || 0.5));
+                const extra = (0.15 + 0.08 * m) / (0.6 + w);
+                item.freshness = Math.max(0, item.freshness - extra);
+            }
+        }
+    }
+
+    /**
+     * Blood and dried stains can also produce a small amount of miasma.
+     * Each tile tracks its own "budget" based on the maximum blood/stain it ever had.
+     * Once the budget is exhausted, the blood/stain is cleaned away (source disappears).
+     */
+    processBloodMiasma() {
+        if (!this.dungeon) return;
+        const TILE_CAP = 10;
+        const width = this.dungeon.width, height = this.dungeon.height;
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const t = this.dungeon.tiles[y][x];
+                if (!t || t.type !== 'floor') continue;
+                const wet = t.blood || 0;
+                const stain = t.bloodStain || 0;
+                if (wet <= 0 && stain <= 0) {
+                    // Reset tracking if tile is clean
+                    if (t.bloodMiasmaInitial != null) {
+                        delete t.bloodMiasmaInitial;
+                        delete t.bloodMiasmaBudget;
+                        delete t.bloodMiasmaEmitted;
+                    }
+                    continue;
+                }
+
+                // Estimate "mass" from wet blood + partial weight of stains
+                const mass = Math.max(1, Math.floor(wet + stain * 0.5));
+                if (typeof t.bloodMiasmaInitial !== 'number') t.bloodMiasmaInitial = mass;
+                // Keep the maximum ever seen so drying/diffusion doesn't reduce potential
+                t.bloodMiasmaInitial = Math.max(t.bloodMiasmaInitial, mass);
+
+                if (typeof t.bloodMiasmaBudget !== 'number') {
+                    // Budget scales with initial mass (small but meaningful)
+                    t.bloodMiasmaBudget = Math.max(1, Math.floor(t.bloodMiasmaInitial * 2));
+                    t.bloodMiasmaEmitted = 0;
+                }
+                if (t.bloodMiasmaBudget <= 0) {
+                    t.blood = 0;
+                    t.bloodStain = 0;
+                    continue;
+                }
+
+                const currentGas = (t.gases && t.gases.miasma) ? t.gases.miasma : 0;
+                if (currentGas >= TILE_CAP) continue;
+
+                // Fresh wet blood emits more readily than old stains
+                const wetFactor = Math.min(1, wet / 10);
+                const stainFactor = Math.min(1, stain / 10) * 0.35;
+                const emitChance = Math.min(0.6, 0.05 + wetFactor * 0.25 + stainFactor * 0.15);
+                if (Math.random() > emitChance) continue;
+
+                // Emit is tiny, but scales slightly with mass
+                const emitAmount = Math.max(1, Math.min(2, 1 + Math.floor(t.bloodMiasmaInitial / 8)));
+                const allowed = Math.max(0, Math.min(emitAmount, TILE_CAP - currentGas, t.bloodMiasmaBudget));
+                if (allowed <= 0) continue;
+
+                if (typeof this.dungeon.addGas === 'function') {
+                    this.dungeon.addGas(x, y, 'miasma', allowed);
+                    t.bloodMiasmaBudget -= allowed;
+                    t.bloodMiasmaEmitted = (t.bloodMiasmaEmitted || 0) + allowed;
+                }
+
+                // When budget is exhausted, the blood/stain source disappears
+                if (t.bloodMiasmaBudget <= 0) {
+                    t.blood = 0;
+                    t.bloodStain = 0;
+                }
+            }
         }
     }
     

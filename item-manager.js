@@ -25,6 +25,9 @@ class ItemManager {
             maxStackSize: 1,
             weight
         });
+        // Rot / gas emission state (processed by Game each world step)
+        corpse.rotTurns = 0;
+        corpse.miasmaEmitting = false;
         this.addItem(corpse);
         return corpse;
     }

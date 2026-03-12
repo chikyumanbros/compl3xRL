@@ -30,7 +30,8 @@ class Dungeon {
                     blood: 0,
                     bloodStain: 0,
                     scent: 0,
-                    liquids: {}
+                    liquids: {},
+                    gases: {}
                 };
             }
         }
@@ -142,6 +143,19 @@ class Dungeon {
     }
 
     /**
+     * Add a gas type to a tile (delegates to Gases when available)
+     */
+    addGas(x, y, type, amount = 1) {
+        if (typeof Gases !== 'undefined') return Gases.addGas(this, x, y, type, amount);
+        if (!this.isInBounds(x, y)) return false;
+        const tile = this.getTile(x, y);
+        if (!tile || tile.type !== 'floor') return false;
+        if (!tile.gases) tile.gases = {};
+        tile.gases[type] = (tile.gases[type] || 0) + Math.max(1, Math.floor(amount));
+        return true;
+    }
+
+    /**
      * Simulate drying/diffusion for blood and liquids; decay scent
      */
     stepLiquids() {
@@ -208,6 +222,31 @@ class Dungeon {
                     if (delta !== 0) {
                         const t = this.tiles[y][x];
                         t.blood = Math.max(0, Math.min(10, (t.blood || 0) + delta));
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Simulate diffusion/decay for tile gases (delegates to Gases when available)
+     */
+    stepGases() {
+        if (typeof Gases !== 'undefined') {
+            Gases.step(this);
+        } else {
+            // Minimal fallback: decay gases slowly
+            const width = this.width, height = this.height;
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const t = this.tiles[y][x];
+                    if (!t || t.type !== 'floor' || !t.gases) continue;
+                    for (const key of Object.keys(t.gases)) {
+                        if (t.gases[key] <= 0) { delete t.gases[key]; continue; }
+                        if (Math.random() < 0.15) {
+                            t.gases[key] = Math.max(0, t.gases[key] - 1);
+                            if (t.gases[key] === 0) delete t.gases[key];
+                        }
                     }
                 }
             }

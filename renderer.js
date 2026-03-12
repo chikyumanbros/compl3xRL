@@ -207,6 +207,11 @@ class Renderer {
                                     const main = types[0]?.[0];
                                     if (main === 'potion') color = 'potion_spill';
                                     else color = 'blood_mid';
+                                } else if (visibility.visible && tile.gases && (tile.gases.miasma || 0) > 0) {
+                                    const g = tile.gases.miasma || 0;
+                                    if (g >= 7) color = 'gas_miasma_high';
+                                    else if (g >= 3) color = 'gas_miasma_mid';
+                                    else color = 'gas_miasma_low';
                                 } else {
                                     color = visibility.visible ? 'floor' : 'floor_memory';
                                 }
