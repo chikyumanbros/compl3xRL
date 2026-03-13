@@ -193,15 +193,14 @@ class Renderer {
                                 else color = 'floor';
                             } else {
                                 char = this.symbols.floor;
-                                // Gas overlays (priority: steam > fire > miasma)
-                                // NOTE: must be evaluated before liquids/blood, otherwise steam is hidden.
-                                if (visibility.visible && tile.gases && ((tile.gases.fire || 0) > 0 || (tile.gases.steam || 0) > 0 || (tile.gases.miasma || 0) > 0)) {
-                                    const f = tile.gases.fire || 0;
-                                    const s = tile.gases.steam || 0;
-                                    const g = tile.gases.miasma || 0;
+                                // Gas/temperature overlays (priority: steam > heat/fire > miasma). Fire from tile.temperature.
+                                const heat = (typeof Temperature !== 'undefined' && tile && typeof tile.temperature === 'number') ? Temperature.getTemperature(tile) : 0;
+                                const s = (tile.gases && tile.gases.steam) ? tile.gases.steam : 0;
+                                const g = (tile.gases && tile.gases.miasma) ? tile.gases.miasma : 0;
+                                const fireLevel = (typeof Temperature !== 'undefined' && heat >= (Temperature.FIRE_THRESHOLD || 50)) ? Math.min(10, Math.floor((heat - (Temperature.FIRE_THRESHOLD || 50)) / 5) + 1) : 0;
+                                if (visibility.visible && (fireLevel > 0 || s > 0 || g > 0)) {
                                     if (s > 0) {
-                                        // If steam and fire coexist, use a more obvious composite tint
-                                        if (f > 0) {
+                                        if (fireLevel > 0) {
                                             if (s >= 7) color = 'gas_steam_fire_high';
                                             else if (s >= 3) color = 'gas_steam_fire_mid';
                                             else color = 'gas_steam_fire_low';
@@ -210,9 +209,9 @@ class Renderer {
                                             else if (s >= 3) color = 'gas_steam_mid';
                                             else color = 'gas_steam_low';
                                         }
-                                    } else if (f > 0) {
-                                        if (f >= 7) color = 'gas_fire_high';
-                                        else if (f >= 3) color = 'gas_fire_mid';
+                                    } else if (fireLevel > 0) {
+                                        if (heat >= (Temperature.FIRE_HIGH || 65)) color = 'gas_fire_high';
+                                        else if (fireLevel >= 3) color = 'gas_fire_mid';
                                         else color = 'gas_fire_low';
                                     } else {
                                         if (g >= 7) color = 'gas_miasma_high';
@@ -387,8 +386,7 @@ class Renderer {
             }
         }
         
-        document.getElementById('player-level').textContent = `Level: ${player.level}`;
-        document.getElementById('player-exp').textContent = `Exp: ${player.exp}/${player.expToNext}`;
+        // レベル／経験値の概念は廃止したので表示しない
         document.getElementById('player-pos').textContent = `Position: (${player.x},${player.y})`;
         
         // Update combat stats (use stats object for consistency)
@@ -529,6 +527,23 @@ class Renderer {
                 hungerElement.textContent = stats.hungerStatus.name;
                 hungerElement.style.color = stats.hungerStatus.color;
                 hungerElement.style.display = 'block';
+            }
+        }
+
+        // Update light source / remaining burn time
+        const lightElement = document.getElementById('light-status');
+        if (lightElement) {
+            const lightItem = player.equipment && player.equipment.light ? player.equipment.light : null;
+            if (lightItem && typeof lightItem.burnTime === 'number') {
+                const remaining = typeof lightItem.remainingBurnTime === 'number'
+                    ? lightItem.remainingBurnTime
+                    : lightItem.burnTime;
+                const active = player.lightActive !== false;
+                lightElement.style.display = 'block';
+                const stateText = active ? 'ON' : 'OFF';
+                lightElement.textContent = `Light: ${lightItem.name} [${stateText}] (${remaining} turns left)`;
+            } else {
+                lightElement.style.display = 'none';
             }
         }
         
@@ -926,6 +941,12 @@ class Renderer {
                         }
                     }
                 }
+                if (typeof Temperature !== 'undefined' && Temperature.getTemperature && Temperature.getTemperature(tile) >= (Temperature.HOT_DISPLAY || 35)) {
+                    results.push({ label: 'Heat', amount: Temperature.getTemperature(tile), directionText, distance, kind: 'gas' });
+                }
+                if (typeof Temperature !== 'undefined' && Temperature.COLD_THRESHOLD != null && Temperature.getTemperature(tile) <= Temperature.COLD_THRESHOLD) {
+                    results.push({ label: 'Cold', amount: Temperature.getTemperature(tile), directionText, distance, kind: 'cold' });
+                }
             }
         }
         return results.sort((a, b) => a.distance - b.distance);
@@ -1100,6 +1121,23 @@ class Renderer {
                 amuletSlot.textContent = `Amulet: ${enchantDisplay}${amulet.name}${qualityText}${conditionText}${statsText}`;
             } else {
                 amuletSlot.textContent = `Amulet: None`;
+            }
+        }
+
+        // Update light source slot (torch, lantern, etc.)
+        const lightSlot = document.getElementById('light-slot');
+        if (lightSlot) {
+            if (equipment.light) {
+                const lightItem = equipment.light;
+                const { qualityText, conditionText } = Player.getEquipmentDisplayInfo(lightItem);
+                const remaining = typeof lightItem.remainingBurnTime === 'number'
+                    ? lightItem.remainingBurnTime
+                    : (typeof lightItem.burnTime === 'number' ? lightItem.burnTime : null);
+                const remainingText = remaining != null ? ` (${remaining} turns left)` : '';
+                const stateText = player.lightActive !== false ? 'ON' : 'OFF';
+                lightSlot.textContent = `Light: ${lightItem.name}${qualityText}${conditionText} [${stateText}]${remainingText}`;
+            } else {
+                lightSlot.textContent = 'Light: None';
             }
         }
     }

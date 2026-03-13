@@ -43,8 +43,8 @@ class Player {
         this.x = x;
         this.y = y;
         
-        // Base stats
-        this.level = 1; // Start at level 1
+        // Base stats（序盤を遊びやすくするため盛り気味に調整）
+        this.level = 3; // 実質的な強さはレベル3相当として扱う
         this.hp = 10; // Will be updated after ability scores
         this.maxHp = 10;
         this.mp = 0;
@@ -52,13 +52,13 @@ class Player {
         this.exp = 0;
         this.expToNext = 15; // Set higher for testing stability
         
-        // Combat stats (Basic starting character)
-        this.strength = 14;      // Good starting strength
-        this.dexterity = 12;     // Average dexterity
-        this.constitution = 14;  // Good constitution for HP
-        this.intelligence = 10;  // Average intelligence
-        this.wisdom = 11;        // Average wisdom
-        this.charisma = 10;      // Average charisma
+        // Combat stats (盛った初期キャラ)
+        this.strength = 16;      // 高めの筋力
+        this.dexterity = 14;     // 良好な敏捷
+        this.constitution = 16;  // 高めの体力でHP多め
+        this.intelligence = 10;  // 平均的
+        this.wisdom = 11;        // 平均的
+        this.charisma = 10;      // 平均的
         
         // Derived stats (Classic Roguelike - AD&D style)
         this.toHit = this.getClassicModifier(this.strength) + this.level; // STR modifier + level
@@ -69,9 +69,9 @@ class Player {
         // Game state
         this.turnCount = 0;
         
-        // Regeneration system
+        // Regeneration system（やや早め）
         this.lastRegenTurn = 0;
-        this.regenInterval = 10; // Heal every 10 turns
+        this.regenInterval = 8; // Heal every 8 turns
         this.regenAmount = 1; // Heal 1 HP per interval
         
         // Speed system (classic roguelike energy system)
@@ -99,7 +99,8 @@ class Player {
             boots: null,
             ring1: null,  // Left hand ring
             ring2: null,  // Right hand ring
-            amulet: null
+            amulet: null,
+            light: null   // Hand-held light source (torch, lantern, etc.)
         };
         
         // Inventory system
@@ -110,6 +111,9 @@ class Player {
         this.penetration = 0; // Player's weapon penetration
         this.totalProtection = 0; // Total protection from all armor
         this.blockChance = 0; // Shield block chance percentage
+
+        // Light source state (torch on/off)
+        this.lightActive = true; // Start with light sources active by default
         
         // Calculate initial HP/MP based on ability scores
         this.calculateInitialStats();
@@ -400,6 +404,24 @@ class Player {
             } else {
                 console.warn('Failed to create starting healing potion');
             }
+
+            // Add and auto-equip a torch as initial light source
+            try {
+                if (typeof EQUIPMENT_TYPES !== 'undefined' && EQUIPMENT_TYPES.tools && EQUIPMENT_TYPES.tools.torch) {
+                    const torch = EquipmentManager.createEquipment('tools', 'torch');
+                    if (torch) {
+                        // 初期松明は装備スロットにのみ入れる（インベントリには入れない）
+                        this.equipment.light = torch;
+                        this.updateCombatStats();
+                        this.updateCurrentWeight();
+                        if (window.game && window.game.renderer) {
+                            window.game.renderer.addBattleLogMessage('You start with a lit torch in hand.', 'normal');
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to create or equip starting torch:', e);
+            }
             
         } else {
             console.error('EquipmentManager not available - falling back to basic items');
@@ -470,45 +492,10 @@ class Player {
     }
     
     /**
-     * Gain experience points
+     * 経験値システムは廃止したので、呼ばれても何もしない
      */
     gainExp(amount) {
-        this.exp += amount;
-        
-        while (this.exp >= this.expToNext) {
-            this.levelUp();
-        }
-    }
-    
-    /**
-     * Level up the player
-     */
-    levelUp() {
-        this.level++;
-        this.exp -= this.expToNext;
-        this.expToNext = Math.floor(this.expToNext * 1.5); // Standard progression
-        
-        // Classic Roguelike level up
-        const conModifier = this.getClassicModifier(this.constitution);
-        const hpIncrease = Math.floor(Math.random() * 8) + 1 + conModifier; // d8 + CON mod
-        const intModifier = this.getClassicModifier(this.intelligence);
-        const mpIncrease = Math.max(0, intModifier); // MP increase based on INT
-        
-        this.maxHp += Math.max(1, hpIncrease); // Minimum 1 HP per level
-        this.maxMp += mpIncrease; // MP based on INT
-        this.hp = this.maxHp; // Full heal on level up
-        this.mp = this.maxMp;
-        
-        // Improve regeneration with level
-        this.regenInterval = Math.max(5, 15 - this.level); // Faster regen at higher levels
-        
-        // Classic roguelike: no automatic stat increases
-        // Stats improve through magical means (potions, equipment, etc.)
-        
-        // Update derived stats with equipment
-        this.updateCombatStats();
-        
-        
+        return 0;
     }
     
 
@@ -633,7 +620,8 @@ class Player {
             gloves: null,
             boots: null,
             ring: null,
-            amulet: null
+            amulet: null,
+            light: null
         };
         
         // Reinitialize with new format
@@ -1270,6 +1258,9 @@ class Player {
                 break;
             case 'boots':
                 slot = 'boots';
+                break;
+            case 'light':
+                slot = 'light';
                 break;
             case 'ring':
                 // Choose the first available ring slot
@@ -2422,7 +2413,8 @@ class Player {
      * @returns {number} Current sight range (1-15)
      */
     getEffectiveSightRange() {
-        let baseSightRange = 5; // Default sight range
+        // ベース視界: 光源OFF時
+        let baseSightRange = 2; // No light: 2 タイル程度
         
         // Check for blood in eyes effect (vision severely impaired)
         if (this.statusEffects && this.statusEffects.hasEffect && this.statusEffects.hasEffect('blood_eyes')) {
@@ -2431,9 +2423,14 @@ class Player {
             baseSightRange = Math.max(1, 3 - severity);
         }
         
-        // Future: Add equipment bonuses (lantern, torch, etc.)
+        // 光源ONなら、シンプルに視界を大きく広げる（装備状態に関わらず確実に差が出るようにする）
+        // OFF: 2 / ON: 6（血などのペナルティはこの後の baseSightRange に反映済み）
+        if (this.lightActive) {
+            baseSightRange = Math.max(baseSightRange, 6);
+        }
+        
         // Future: Add other status effects (darkness, blindness, etc.)
         
-        return baseSightRange;
+        return Math.max(1, Math.min(15, baseSightRange));
     }
 } 

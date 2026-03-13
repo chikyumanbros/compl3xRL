@@ -287,6 +287,22 @@ class Game {
         // Process player hunger system
         this.player.processHunger();
 
+        // Burn down equipped light sources (torch, etc.) per player action, only while active
+        if (this.player.equipment && this.player.equipment.light && this.player.lightActive) {
+            const lightItem = this.player.equipment.light;
+            if (typeof lightItem.burnTime === 'number') {
+                if (typeof lightItem.remainingBurnTime !== 'number') {
+                    lightItem.remainingBurnTime = lightItem.burnTime;
+                }
+                if (lightItem.remainingBurnTime > 0) {
+                    lightItem.remainingBurnTime--;
+                    if (lightItem.remainingBurnTime === 0 && this.renderer) {
+                        this.renderer.addLogMessage('Your torch burns out.', 'warning');
+                    }
+                }
+            }
+        }
+
         // Leave scent trail (used by sniffing AI)
         if (this.dungeon && typeof this.dungeon.addScent === 'function') {
             this.dungeon.addScent(this.player.x, this.player.y, 5);
@@ -346,10 +362,12 @@ class Game {
         if (this.dungeon && typeof this.dungeon.stepGases === 'function') {
             this.dungeon.stepGases();
         }
-        // Fire interactions: ignition/explosions/damage
+        // Fire interactions: ignition/explosions/damage (per-item/creature ignition thresholds)
         this.processFire();
         // Steam interactions: heat damage (separate from fire)
         this.processSteam();
+        // Cold/freeze: per-item and per-creature freeze thresholds
+        this.processCold();
         // Miasma contact accelerates food spoilage (ground + inventory)
         this.processMiasmaFoodRot();
         
@@ -578,19 +596,22 @@ class Game {
     }
 
     /**
-     * Fire system:
-     * - Fire is stored as tile.gases.fire
-     * - Touching fire deals damage (player + monsters)
-     * - Flammables on a burning tile are consumed and strengthen fire
-     * - If miasma exists adjacent to fire, it triggers an explosion-like spread
+     * Fire system (temperature-based for extensibility: future freeze uses same scale).
+     * - Heat is stored as tile.temperature (Temperature.FIRE_THRESHOLD+ = burning)
+     * - Touching hot tiles deals damage; flammables add heat; liquids cool and create steam
+     * - If miasma is adjacent to fire, it triggers an explosion-like spread (adds heat)
      */
     processFire() {
-        if (!this.dungeon) return;
+        if (!this.dungeon || typeof Temperature === 'undefined') return;
         const width = this.dungeon.width;
         const height = this.dungeon.height;
+        const AMBIENT = Temperature.AMBIENT;
+        const FIRE_THRESHOLD = Temperature.FIRE_THRESHOLD;
 
         const inBounds = (x, y) => this.dungeon && this.dungeon.isInBounds(x, y);
         const getTile = (x, y) => (inBounds(x, y) ? this.dungeon.getTile(x, y) : null);
+        const getTemp = (x, y) => Temperature.getTemperature(getTile(x, y));
+        const heatLevel = (x, y) => Temperature.temperatureToFireLevel(getTile(x, y));
         const getGas = (x, y, type) => {
             const t = getTile(x, y);
             return (t && t.gases && t.gases[type]) ? t.gases[type] : 0;
@@ -604,17 +625,8 @@ class Game {
             if (next <= 0) delete t.gases[type];
             else t.gases[type] = next;
         };
-        const addFire = (x, y, amount) => {
-            if (!inBounds(x, y)) return false;
-            const t = this.dungeon.getTile(x, y);
-            if (!t || t.type !== 'floor') return false;
-            if (typeof this.dungeon.addGas === 'function') {
-                return this.dungeon.addGas(x, y, 'fire', amount);
-            }
-            if (!t.gases) t.gases = {};
-            t.gases.fire = (t.gases.fire || 0) + Math.max(1, Math.floor(amount));
-            return true;
-        };
+        /** Add heat (replaces addFire). ~5 heat per old "fire level" so 10 levels ≈ 50 = threshold. */
+        const addHeat = (x, y, amount) => Temperature.addHeat(this.dungeon, x, y, Math.max(0, Math.floor(amount)) * 5);
         const addSteam = (x, y, amount) => {
             if (!inBounds(x, y)) return false;
             const t = this.dungeon.getTile(x, y);
@@ -633,15 +645,30 @@ class Game {
             if (item.type === 'food') return true;
             if (item.material === 'wood') return true;
             if (item.material === 'leather') return true;
+            // Light sources like torches are explicitly flammable
+            if (item.type === 'light') return true;
             return false;
         };
 
-        const applyFireContactDamage = (x, y, fireLevel) => {
-            if (fireLevel <= 0) return;
-            const dmg = Math.max(1, Math.min(6, 1 + Math.floor(fireLevel / 2)));
+        const getCreatureIgnitionTemp = (entity) => {
+            if (!entity) return FIRE_THRESHOLD;
+            const res = (typeof entity.getElementalResistance === 'function') ? (entity.getElementalResistance('fire') || 0) : 0;
+            return Math.min(75, FIRE_THRESHOLD + Math.floor(res / 100 * 15));
+        };
+        const getCreatureFreezeTemp = (entity) => {
+            if (!entity) return Temperature.COLD_THRESHOLD;
+            const res = (typeof entity.getElementalResistance === 'function') ? (entity.getElementalResistance('cold') || 0) : 0;
+            return Math.max(0, Temperature.COLD_THRESHOLD - Math.floor(res / 100 * 5));
+        };
 
-            // Player
-            if (this.player && this.player.x === x && this.player.y === y) {
+        const applyFireContactDamage = (x, y, fireLevel) => {
+            const temp = getTemp(x, y);
+            if (fireLevel <= 0) return;
+            // 火炎ダメージを全体的にマイルドにする（最大 3 ダメージ程度）
+            const dmg = Math.max(1, Math.min(3, 1 + Math.floor(fireLevel / 3)));
+
+            // Player (only if tile is hot enough for this creature's ignition threshold)
+            if (this.player && this.player.x === x && this.player.y === y && temp >= getCreatureIgnitionTemp(this.player)) {
                 // Apply elemental resistance (fire) if available
                 const fireRes = (typeof this.player.getElementalResistance === 'function') ? (this.player.getElementalResistance('fire') || 0) : 0;
                 const resisted = Math.min(95, Math.max(0, Math.floor(fireRes)));
@@ -659,13 +686,14 @@ class Game {
                     this.dungeon.addBlood(x, y, 1);
                 }
 
-                // Equipped flammable items degrade when you are in fire
+                // Equipped flammable items degrade when tile is hot enough for that item's ignition threshold
                 if (this.player.equipment && typeof this.player.equipment === 'object') {
                     const slots = Object.keys(this.player.equipment);
                     const amt = Math.max(1, Math.min(4, 1 + Math.floor(fireLevel / 3)));
                     for (const slot of slots) {
                         const eq = this.player.equipment[slot];
                         if (!eq) continue;
+                        if (temp < Temperature.getItemIgnitionTemp(eq)) continue;
                         if ((eq.material === 'wood' || eq.material === 'leather') && typeof eq.takeDurabilityDamage === 'function') {
                             const matMod = eq.material === 'leather' ? 0.75 : 1.0;
                             const d = Math.max(1, Math.min(4, Math.ceil(amt * matMod)));
@@ -679,10 +707,10 @@ class Game {
                 }
             }
 
-            // Monster
+            // Monster (only if tile is hot enough for this creature's ignition threshold)
             if (this.monsterSpawner && typeof this.monsterSpawner.getMonsterAt === 'function') {
                 const m = this.monsterSpawner.getMonsterAt(x, y);
-                if (m && m.isAlive) {
+                if (m && m.isAlive && temp >= getCreatureIgnitionTemp(m)) {
                     if (this.renderer && this.isTileVisible(x, y)) {
                         this.renderer.addLogMessage(`${m.name} is burned!`, 'warning');
                     }
@@ -697,13 +725,15 @@ class Game {
         };
 
         const consumeFlammablesOnTile = (x, y, fireLevel = 0) => {
+            const tileTemp = getTemp(x, y);
             let fuel = 0;
 
-            // Ground items
+            // Ground items (only burn when tile temp >= this item's ignition threshold)
             if (this.itemManager && typeof this.itemManager.getItemsAt === 'function') {
                 const items = this.itemManager.getItemsAt(x, y) || [];
                 for (const item of items) {
                     if (!isItemFlammable(item)) continue;
+                    if (tileTemp < Temperature.getItemIgnitionTemp(item)) continue;
                     // Corpses/food are consumed as fuel; wooden equipment/items degrade instead of disappearing.
                     if (item.type === 'corpse' || item.type === 'food') {
                         fuel += (item.type === 'corpse') ? 3 : 1;
@@ -789,12 +819,16 @@ class Game {
             }
             if (consumed <= 0) return false;
 
-            const blast = Math.max(2, Math.min(10, 2 + Math.floor(consumed / 4)));
-            const fireBoost = Math.max(2, Math.min(10, 3 + Math.floor(consumed / 5)));
+            // Miasma 爆発もやや控えめに（特に序盤で即死しないよう調整）
+            const blast = Math.max(1, Math.min(6, 1 + Math.floor(consumed / 6)));
+            const fireBoost = Math.max(1, Math.min(8, 2 + Math.floor(consumed / 6)));
+            // Sharp temperature spike so explosion is clearly visible (heat units * 5 = temp rise)
+            const centerHeat = Math.max(16, fireBoost * 3);
+            const radiusHeat = Math.max(8, fireBoost * 2);
 
             for (const p of radiusTiles) {
                 const tx = p.x, ty = p.y;
-                addFire(tx, ty, Math.max(1, Math.floor(fireBoost / 2)));
+                addHeat(tx, ty, p.d === 0 ? centerHeat : radiusHeat);
 
                 // Immediate blast damage inside diffusion-radius (matches spread shape)
                 if (p.d <= 2) {
@@ -827,27 +861,76 @@ class Game {
                 }
             }
 
-            // Center burns hotter
-            addFire(x, y, fireBoost);
             return true;
         };
 
-        // Snapshot fire tiles (so we don't chase newly created fires endlessly this step)
+        // If the player is standing in miasma with an active fire-handling light source, treat it as an ignition source.
+        if (this.player && this.player.equipment && this.player.equipment.light && this.player.lightActive) {
+            const px = this.player.x;
+            const py = this.player.y;
+            const t = getTile(px, py);
+            if (t && t.type === 'floor') {
+                const mHere = getGas(px, py, 'miasma');
+                if (mHere > 0) {
+                    // 引火させる：プレイヤーの足元で miasma 爆発ロジックを起動
+                    triggerMiasmaExplosionIfNeeded(px, py);
+                }
+            }
+        }
+
+        // Temperature decay (faster: always -1 when hot, extra -2 with 40% chance) and diffusion to all cooler neighbors
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const t = getTile(x, y);
+                if (!t || t.type !== 'floor') continue;
+                const temp = Temperature.getTemperature(t);
+                if (temp <= AMBIENT) continue;
+                Temperature.setTemperature(t, temp); // ensure tile has temperature so it decays next time
+                let newTemp = temp - 1;
+                if (Math.random() < 0.40) newTemp = Math.max(AMBIENT, newTemp - 2);
+                Temperature.setTemperature(t, newTemp);
+            }
+        }
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const t = getTile(x, y);
+                if (!t || t.type !== 'floor') continue;
+                const temp = Temperature.getTemperature(t);
+                if (temp <= 25 || Math.random() > 0.28) continue;
+                const dirs = [[0, -1], [0, 1], [1, 0], [-1, 0]];
+                const cooler = [];
+                for (const [dx, dy] of dirs) {
+                    const nt = getTile(x + dx, y + dy);
+                    if (nt && nt.type === 'floor' && Temperature.getTemperature(nt) < temp) cooler.push({ nx: x + dx, ny: y + dy, nt });
+                }
+                if (cooler.length === 0) continue;
+                const give = 2;
+                const totalGive = give * cooler.length;
+                if (temp - totalGive < AMBIENT) continue;
+                Temperature.setTemperature(t, temp - totalGive);
+                for (const { nx, ny, nt } of cooler) {
+                    const ntemp = Temperature.getTemperature(nt);
+                    Temperature.setTemperature(nt, ntemp + give);
+                }
+            }
+        }
+
+        // Snapshot hot tiles (temperature >= FIRE_THRESHOLD)
         const fireTiles = [];
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const t = this.dungeon.tiles[y][x];
-                const f = (t && t.gases && t.gases.fire) ? t.gases.fire : 0;
-                if (t && t.type === 'floor' && f > 0) fireTiles.push({ x, y, f });
+                const temp = (t && t.type === 'floor') ? Temperature.getTemperature(t) : 0;
+                if (t && t.type === 'floor' && temp >= FIRE_THRESHOLD) fireTiles.push({ x, y });
             }
         }
 
         for (const ft of fireTiles) {
             const { x, y } = ft;
-            let fireLevel = getGas(x, y, 'fire');
-            if (fireLevel <= 0) continue;
+            let temp = getTemp(x, y);
+            if (temp < FIRE_THRESHOLD) continue;
 
-            // Liquids suppress fire on the same tile (extinguish/steam)
+            // Liquids cool the tile (extinguish/steam)
             const tileHere = getTile(x, y);
             if (tileHere && tileHere.type === 'floor') {
                 const bloodWet = Math.max(0, Math.floor(tileHere.blood || 0));
@@ -859,15 +942,12 @@ class Game {
                 }
                 const totalWet = bloodWet + otherWet;
                 if (totalWet > 0) {
-                    // Stronger suppression: even shallow liquids/blood quickly quench fire
                     const suppress = Math.max(1, Math.min(7, 2 + Math.floor(totalWet / 3)));
-                    const nextFire = Math.max(0, fireLevel - suppress);
-                    setGas(x, y, 'fire', nextFire);
-                    fireLevel = nextFire;
-                    // Generate steam proportional to suppression + wetness
+                    const heatRemove = suppress * 5;
+                    Temperature.removeHeat(this.dungeon, x, y, heatRemove);
+                    temp = getTemp(x, y);
                     addSteam(x, y, Math.max(1, Math.min(6, suppress + Math.floor(totalWet / 6))));
 
-                    // Consume a bit of liquid as it evaporates while suppressing fire
                     let consume = Math.max(1, Math.min(3, suppress));
                     if (tileHere.blood && tileHere.blood > 0) {
                         const take = Math.min(tileHere.blood, consume);
@@ -885,25 +965,20 @@ class Game {
                             consume -= take;
                         }
                     }
-                    // If fully extinguished, skip further processing for this tile
-                    if (fireLevel <= 0) continue;
+                    if (temp < FIRE_THRESHOLD) continue;
                 }
             }
 
-            // Explosion if miasma is around
             triggerMiasmaExplosionIfNeeded(x, y);
 
-            // Contact damage
-            fireLevel = getGas(x, y, 'fire');
+            const fireLevel = heatLevel(x, y);
             applyFireContactDamage(x, y, fireLevel);
 
-            // Consume flammables on tile -> strengthen fire
             const fuel = consumeFlammablesOnTile(x, y, fireLevel);
             if (fuel > 0) {
-                addFire(x, y, Math.min(6, fuel));
+                addHeat(x, y, Math.min(6, fuel));
             }
 
-            // Ignite adjacent tiles if they have flammable stuff or miasma
             for (let dx = -1; dx <= 1; dx++) {
                 for (let dy = -1; dy <= 1; dy++) {
                     if (dx === 0 && dy === 0) continue;
@@ -912,14 +987,23 @@ class Game {
                     if (!t || t.type !== 'floor') continue;
 
                     const m = getGas(tx, ty, 'miasma');
-                    let shouldIgnite = m > 0;
-                    if (!shouldIgnite && this.itemManager && typeof this.itemManager.getItemsAt === 'function') {
+                    let shouldIgnite = false;
+                    let heatAmount = 0;
+
+                    // Miasma adjacent to fire ignites almost immediately and strongly
+                    if (m > 0) {
+                        shouldIgnite = true;
+                        heatAmount = Math.max(10, m * 5); // big spike so explosion/ignition is obvious
+                    } else if (this.itemManager && typeof this.itemManager.getItemsAt === 'function') {
                         const items = this.itemManager.getItemsAt(tx, ty) || [];
-                        if (items.some(isItemFlammable)) shouldIgnite = true;
+                        if (items.some(isItemFlammable)) {
+                            shouldIgnite = Math.random() < 0.6;
+                            heatAmount = 5; // normal spread from flammables
+                        }
                     }
-                    // Living beings ignite by contact (standing on fire), not adjacency; damage handled above.
-                    if (shouldIgnite && Math.random() < 0.6) {
-                        addFire(tx, ty, 1);
+
+                    if (shouldIgnite && heatAmount > 0) {
+                        addHeat(tx, ty, heatAmount);
                     }
                 }
             }
@@ -1003,6 +1087,79 @@ class Game {
         }
 
         // Cleanup dead monsters if steam killed them
+        if (this.monsterSpawner && typeof this.monsterSpawner.removeDeadMonsters === 'function') {
+            this.monsterSpawner.removeDeadMonsters();
+        }
+        if (this.player && this.player.hp <= 0) {
+            this.gameOver();
+        }
+    }
+
+    /**
+     * Cold/freeze: tiles with temp <= COLD_THRESHOLD affect creatures (cold damage) and items (freeze/shatter).
+     * Uses per-entity and per-item freeze thresholds for extensibility.
+     */
+    processCold() {
+        if (!this.dungeon || typeof Temperature === 'undefined') return;
+        const COLD = Temperature.COLD_THRESHOLD;
+
+        const getTile = (x, y) => (this.dungeon.isInBounds(x, y) ? this.dungeon.getTile(x, y) : null);
+        const getTemp = (x, y) => Temperature.getTemperature(getTile(x, y));
+        const getCreatureFreezeTemp = (entity) => {
+            if (!entity) return COLD;
+            const res = (typeof entity.getElementalResistance === 'function') ? (entity.getElementalResistance('cold') || 0) : 0;
+            return Math.max(0, COLD - Math.floor(res / 100 * 5));
+        };
+
+        for (let y = 0; y < this.dungeon.height; y++) {
+            for (let x = 0; x < this.dungeon.width; x++) {
+                const temp = getTemp(x, y);
+                if (temp > COLD) continue;
+
+                const coldDmg = Math.max(1, Math.min(4, 1 + Math.floor((COLD - temp) / 3)));
+
+                if (this.player && this.player.x === x && this.player.y === y && temp <= getCreatureFreezeTemp(this.player)) {
+                    const coldRes = (typeof this.player.getElementalResistance === 'function') ? (this.player.getElementalResistance('cold') || 0) : 0;
+                    const resisted = Math.min(95, Math.max(0, Math.floor(coldRes)));
+                    const finalDmg = Math.max(0, Math.ceil(coldDmg * (1 - resisted / 100)));
+                    if (this.renderer && this.isTileVisible(x, y)) {
+                        const suffix = resisted > 0 ? ` (cold resist ${resisted}%)` : '';
+                        this.renderer.addLogMessage(`You are freezing! (${finalDmg} damage)${suffix}`, 'damage');
+                    }
+                    if (typeof this.player.takeDirectDamage === 'function') this.player.takeDirectDamage(finalDmg);
+                    else this.player.hp = Math.max(0, (this.player.hp || 0) - finalDmg);
+                }
+
+                if (this.monsterSpawner && typeof this.monsterSpawner.getMonsterAt === 'function') {
+                    const m = this.monsterSpawner.getMonsterAt(x, y);
+                    if (m && m.isAlive && temp <= getCreatureFreezeTemp(m)) {
+                        if (this.renderer && this.isTileVisible(x, y)) {
+                            this.renderer.addLogMessage(`${m.name} is freezing!`, 'warning');
+                        }
+                        if (typeof m.takeDamage === 'function') m.takeDamage(coldDmg, 0);
+                        else {
+                            m.hp = Math.max(0, (m.hp || 0) - coldDmg);
+                            if (m.hp <= 0) m.isAlive = false;
+                        }
+                    }
+                }
+
+                if (this.itemManager && typeof this.itemManager.getItemsAt === 'function') {
+                    const items = this.itemManager.getItemsAt(x, y) || [];
+                    for (const item of items) {
+                        const freezeTemp = Temperature.getItemFreezeTemp(item);
+                        if (temp > freezeTemp) continue;
+                        if (item.type === 'potion') {
+                            this.itemManager.removeItem(item);
+                            if (this.renderer && this.isTileVisible(x, y)) {
+                                this.renderer.addLogMessage(`The ${item.name} freezes and shatters!`, 'warning');
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (this.monsterSpawner && typeof this.monsterSpawner.removeDeadMonsters === 'function') {
             this.monsterSpawner.removeDeadMonsters();
         }
@@ -1158,7 +1315,7 @@ class Game {
                     if (this.renderer && this.isTileVisible(monster.x, monster.y)) {
                         this.renderer.addLogMessage(`The ${monster.name} dies from its wounds!`, 'victory');
                     }
-                    this.player.gainExp(monster.expValue);
+                    // 経験値システムは廃止したので EXP は付与しない
                     // Drop corpse for DoT deaths
                     if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
                         const corpseChance = this.calculateCorpseChance(monster, 'DoT');

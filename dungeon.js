@@ -31,7 +31,8 @@ class Dungeon {
                     bloodStain: 0,
                     scent: 0,
                     liquids: {},
-                    gases: {}
+                    gases: {},
+                    temperature: (typeof Temperature !== 'undefined' && Temperature.AMBIENT != null) ? Temperature.AMBIENT : 20
                 };
             }
         }

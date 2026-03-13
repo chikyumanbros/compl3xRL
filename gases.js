@@ -10,14 +10,7 @@ const Gases = (function() {
             diffusionChance: 0.35,
             diffusionThreshold: 2
         },
-        fire: {
-            // "Fire" is modeled as a gas-like overlay for rendering + decay,
-            // while actual ignition/explosion logic is handled by Game.
-            max: 10,
-            decayChance: 0.22,
-            diffusionChance: 0.10,
-            diffusionThreshold: 2
-        },
+        // fire: removed; heat is now tile.temperature (see temperature.js). Steam and miasma remain.
         steam: {
             // Steam is generated when fire is suppressed by liquids.
             // It diffuses more than fire and decays relatively quickly.

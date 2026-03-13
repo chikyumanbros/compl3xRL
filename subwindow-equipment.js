@@ -14,7 +14,8 @@
         { key: 'boots', name: 'Boots', keyHint: '(b)', letter: 'b' },
         { key: 'ring1', name: 'Ring (L)', keyHint: '(r)', letter: 'r' },
         { key: 'ring2', name: 'Ring (R)', keyHint: '(1)', letter: '1' },
-        { key: 'amulet', name: 'Amulet', keyHint: '(m)', letter: 'm' }
+        { key: 'amulet', name: 'Amulet', keyHint: '(m)', letter: 'm' },
+        { key: 'light', name: 'Light', keyHint: '(l)', letter: 'l' }
     ];
 
     var SLOT_NAMES = {
@@ -26,7 +27,8 @@
         boots: 'Boots',
         ring1: 'Ring (Left)',
         ring2: 'Ring (Right)',
-        amulet: 'Amulet'
+        amulet: 'Amulet',
+        light: 'Light'
     };
 
     SubWindow.prototype.showEquipment = function (player) {
@@ -142,7 +144,7 @@
         this.textInput.value = '';
 
         var inventory = player.getInventorySummary();
-        var wearableTypes = ['weapon', 'armor', 'shield', 'helmet', 'gloves', 'boots', 'ring', 'amulet'];
+        var wearableTypes = ['weapon', 'armor', 'shield', 'helmet', 'gloves', 'boots', 'ring', 'amulet', 'light'];
         var validItems = inventory.filter(function (item) {
             var letter = item.charAt(0);
             var invItem = player.getInventoryItem(letter);

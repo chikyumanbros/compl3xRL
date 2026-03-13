@@ -22,11 +22,10 @@
                     <div class="player-stats">
                         <h3>--- Player ---</h3>
                         <div id="player-hp">HP: 100/100</div>
-                        <div id="player-level">Level: 1</div>
-                        <div id="player-exp">Exp: 0/100</div>
                         <div id="player-pos">Position: (1,1)</div>
                         <div id="status-effects"></div>
                         <div id="hunger-status" style="display: none;">Not Hungry</div>
+                        <div id="light-status" style="display: none;">Light: None</div>
                         <div id="weight-status">Weight: 0/0</div>
                         <div id="encumbrance-status"></div>
                         <div id="player-ac">AC: 20</div>
@@ -58,6 +57,7 @@
                             <div id="ring1-slot">Ring (L): None</div>
                             <div id="ring2-slot">Ring (R): None</div>
                             <div id="amulet-slot">Amulet: None</div>
+                            <div id="light-slot">Light: None</div>
                         </div>
                     </div>
                     
@@ -145,6 +145,7 @@
     <script src="renderer.js"></script>
     <script src="liquids.js"></script>
     <script src="gases.js"></script>
+    <script src="temperature.js"></script>
     <script src="dungeon.js"></script>
     <script src="fov.js"></script>
     <script src="noise.js"></script>

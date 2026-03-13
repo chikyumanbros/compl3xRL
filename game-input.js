@@ -87,26 +87,26 @@
         }
         const totalWet = wetBlood + otherWet;
 
-        if (typeof this.dungeon.addGas === 'function') {
-            if (totalWet >= 3) {
-                // Very wet surface: fire is immediately quenched into steam only.
+        if (totalWet >= 3) {
+            // Very wet surface: heat is quenched into steam only.
+            if (typeof this.dungeon.addGas === 'function') {
                 const steamAmount = Math.max(1, Math.min(6, 1 + Math.floor(totalWet / 2)));
                 this.dungeon.addGas(tx, ty, 'steam', steamAmount);
-                if (this.renderer && this.isTileVisible(tx, ty)) {
-                    this.renderer.addLogMessage('The wet surface hisses into steam, but does not catch fire.', 'normal');
-                }
-            } else {
-                // Slightly wet: small fire plus a bit of steam
-                this.dungeon.addGas(tx, ty, 'fire', 1);
-                if (totalWet > 0) {
-                    this.dungeon.addGas(tx, ty, 'steam', 1);
-                }
-                if (this.renderer && this.isTileVisible(tx, ty)) {
-                    this.renderer.addLogMessage('You start a fire.', 'normal');
-                }
             }
-        } else if (this.renderer && this.isTileVisible(tx, ty)) {
-            this.renderer.addLogMessage('You start a fire.', 'normal');
+            if (this.renderer && this.isTileVisible(tx, ty)) {
+                this.renderer.addLogMessage('The wet surface hisses into steam, but does not catch fire.', 'normal');
+            }
+        } else {
+            // Ignite: add heat (temperature-based). ~30 heat ≈ at fire threshold.
+            if (typeof Temperature !== 'undefined' && Temperature.addHeat) {
+                Temperature.addHeat(this.dungeon, tx, ty, 30);
+            }
+            if (totalWet > 0 && typeof this.dungeon.addGas === 'function') {
+                this.dungeon.addGas(tx, ty, 'steam', 1);
+            }
+            if (this.renderer && this.isTileVisible(tx, ty)) {
+                this.renderer.addLogMessage('You start a fire.', 'normal');
+            }
         }
         this.postPlayerAction();
     };
@@ -422,10 +422,10 @@
         // Potions are consumed; do not drop item
     };
 
-    // Unified defeat handler for player-caused monster deaths (e.g., thrown items)
-    GameRef.prototype.handleMonsterDefeated = function(monster, cause = 'player') {
+        // Unified defeat handler for player-caused monster deaths (e.g., thrown items)
+        GameRef.prototype.handleMonsterDefeated = function(monster, cause = 'player') {
         if (!monster || monster.isAlive) return;
-        // Prevent double EXP in any edge case
+        // EXP は廃止しているが、多重処理防止フラグはそのまま利用
         if (monster._xpGranted) return;
         monster._xpGranted = true;
         
@@ -435,10 +435,7 @@
             this.renderer.addBattleLogMessage(`You defeat the ${monsterName}!`, 'victory');
         }
         
-        // Grant EXP if defined
-        if (this.player && typeof this.player.gainExp === 'function' && monster.expValue) {
-            this.player.gainExp(monster.expValue);
-        }
+        // 経験値システムは廃止したので EXP は付与しない
 
         // Chance to leave a corpse based on death cause and monster type
         if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
@@ -722,6 +719,24 @@
             case 'KeyL':
                 if (!event.shiftKey) {
                     playerMoved = this.movePlayer(1, 0);
+                } else {
+                    // Shift+L: toggle hand-held light source on/off
+                    event.preventDefault();
+                    if (this.player && this.player.equipment && this.player.equipment.light) {
+                        this.player.lightActive = !this.player.lightActive;
+                        if (this.renderer) {
+                            if (this.player.lightActive) {
+                                this.renderer.addLogMessage('You ignite your light source.', 'normal');
+                            } else {
+                                this.renderer.addLogMessage('You douse your light source.', 'normal');
+                            }
+                        }
+                        // 視界が変わるのでFOVと描画を即更新
+                        this.updateFOV();
+                        this.render();
+                    } else if (this.renderer) {
+                        this.renderer.addLogMessage('You have no light source equipped.', 'normal');
+                    }
                 }
                 break;
             // Diagonal movement (vi keys) - lowercase
@@ -791,6 +806,15 @@
                 // Shift+F: Ignite fire in a direction
                 if (event.shiftKey) {
                     event.preventDefault();
+                    // Require an equipped fire-handling light source (torch, etc.)
+                    const lightItem = this.player && this.player.equipment ? this.player.equipment.light : null;
+                    const hasFireTool = lightItem && lightItem.type === 'light';
+                    if (!hasFireTool) {
+                        if (this.renderer) {
+                            this.renderer.addLogMessage('You need a torch or similar fire source equipped to ignite anything.');
+                        }
+                        return;
+                    }
                     this.beginIgniteDirectionSelection();
                 }
                 break;

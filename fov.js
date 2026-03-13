@@ -64,7 +64,8 @@ class FOV {
      */
     calculateCorridorVisibility(playerX, playerY) {
         const corridorType = this.isInCorridor(playerX, playerY);
-        const range = 3; // Short range in corridors
+        // Corridor sight range also respects current viewRange (light,状態異常など)
+        const range = Math.max(1, Math.min(this.viewRange, 6)); // clamp for safety
         
         if (corridorType === 'horizontal') {
             // See along east-west direction only

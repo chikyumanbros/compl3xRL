@@ -433,7 +433,13 @@ const EQUIPMENT_TYPES = {
             material: 'wood',
             symbol: '~',
             color: '#FFA500',
-            description: 'A wooden torch for illumination.'
+            description: 'A wooden torch for illumination.',
+            // Total burn time in player turns when equipped
+            burnTime: 1500,
+            // Default remaining burn time; actual runtime counter is stored on the instance
+            remainingBurnTime: 1500,
+            // Extra sight radius provided while burning
+            lightRadius: 5
         }
     },
     
