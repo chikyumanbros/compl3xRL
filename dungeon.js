@@ -3,7 +3,7 @@
  * Uses BSP (Binary Space Partitioning) algorithm
  */
 class Dungeon {
-    constructor(width = 80, height = 50) {
+    constructor(width = 160, height = 100) {
         this.width = width;
         this.height = height;
         this.tiles = [];
@@ -268,26 +268,30 @@ class Dungeon {
     }
     
     /**
+     * Get map scale factors for size-dependent generation (reference 80x50).
+     */
+    getMapScale() {
+        const refW = 80, refH = 50;
+        const areaScale = (this.width * this.height) / (refW * refH);
+        const linearScale = Math.sqrt(areaScale);
+        const roomScale = Math.min(2, Math.min(this.width / refW, this.height / refH));
+        return { refW, refH, areaScale, linearScale, roomScale };
+    }
+
+    /**
      * Generate the dungeon - Classic maze-like style
      */
     generate() {
-
-        
         // Generate main rooms
         this.generateRooms();
-        
         // Connect rooms with complex corridor system
         this.connectRooms();
-        
         // Add maze-like passages
         this.addMazePassages();
-        
         // Add secret rooms
         this.addSecretRooms();
-        
         // Add doors
         this.addDoors();
-        
         // Add dead ends for exploration feel
         this.addDeadEnds();
         
@@ -297,40 +301,172 @@ class Dungeon {
 
         // Add traps after terrain features
         this.addTraps();
+
+        // Place vegetation (moss, lichen, fungus) on some floor tiles
+        this.placeVegetation();
+
+        // Place water (groundwater / seepage) so it can spread and feed vegetation
+        this.placeWater();
     }
-    
+
     /**
-     * Generate rooms - Varied sizes and irregular placement
+     * Place initial water on floor tiles (groundwater, seepage, puddles). Uses tile.liquids.water.
+     * Liquids.step() will then spread it (flooding). Vegetation thrives near water.
+     */
+    placeWater() {
+        if (typeof Liquids === 'undefined' || !Liquids.addLiquid) return;
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                const tile = this.tiles[y][x];
+                if (tile.type !== 'floor') continue;
+                const room = this.getRoomAt(x, y);
+                const biome = room && room.biome ? room.biome : 'normal';
+                if (room && room.type === 'start') continue;
+
+                let chance = 0.06;
+                let amount = 2 + Math.floor(Math.random() * 5);
+                if (biome === 'flooded') {
+                    chance = 0.28;
+                    amount = 4 + Math.floor(Math.random() * 8);
+                } else if (biome === 'damp') {
+                    chance = 0.16;
+                    amount = 2 + Math.floor(Math.random() * 6);
+                } else if (biome === 'grove') {
+                    chance = 0.12;
+                } else if (biome === 'crypt') {
+                    chance = 0.04;
+                } else if (biome === 'barracks') chance = 0.02;
+                if (Math.random() > chance) continue;
+                Liquids.addLiquid(this, x, y, 'water', amount);
+            }
+        }
+    }
+
+    /**
+     * Place vegetation on a subset of floor tiles for atmosphere
+     */
+    placeVegetation() {
+        const types = [
+            { id: 'moss', weight: 5 },
+            { id: 'lichen', weight: 3 },
+            { id: 'fungus', weight: 2 }
+        ];
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                const tile = this.tiles[y][x];
+                if (tile.type !== 'floor') continue;
+                const room = this.getRoomAt(x, y);
+                const biome = room && room.biome ? room.biome : 'normal';
+                const isFirstRoom = room && room.type === 'start';
+                if (isFirstRoom) continue;
+
+                let placeChance = 0.22;
+                let typeWeights = [5, 3, 2];
+                if (biome === 'damp' || biome === 'grove') {
+                    placeChance = 0.38;
+                    typeWeights = [8, 6, 2];
+                } else if (biome === 'crypt') {
+                    placeChance = 0.32;
+                    typeWeights = [2, 2, 8];
+                } else if (biome === 'flooded') {
+                    placeChance = 0.12;
+                    typeWeights = [4, 3, 2];
+                } else if (biome === 'barracks') {
+                    placeChance = 0.08;
+                    typeWeights = [2, 2, 1];
+                } else if (biome === 'cave') {
+                    placeChance = 0.26;
+                    typeWeights = [4, 4, 4];
+                }
+                if (Math.random() > placeChance) continue;
+                const total = typeWeights[0] + typeWeights[1] + typeWeights[2];
+                let r = Math.random() * total;
+                if (r < typeWeights[0]) tile.vegetation = 'moss';
+                else if (r < typeWeights[0] + typeWeights[1]) tile.vegetation = 'lichen';
+                else tile.vegetation = 'fungus';
+            }
+        }
+    }
+
+    /**
+     * Vegetation growth: spread under conditions (damp for moss/lichen, organic for fungus)
+     * Call periodically from game loop (e.g. every 25 turns).
+     */
+    stepVegetation() {
+        const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+        const candidates = [];
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                const tile = this.tiles[y][x];
+                if (tile.type !== 'floor' || !tile.vegetation) continue;
+                const veg = tile.vegetation;
+                let spreadChance = 0.08;
+                if (veg === 'moss' || veg === 'lichen') {
+                    const hasWater = tile.liquids && tile.liquids.water && tile.liquids.water > 0;
+                    const damp = (tile.blood && tile.blood > 0) || (tile.liquids && Object.keys(tile.liquids).length > 0);
+                    let adjacentVeg = 0;
+                    let adjacentWater = 0;
+                    for (const [dx, dy] of dirs) {
+                        const t = this.getTile(x + dx, y + dy);
+                        if (t.type === 'floor' && t.vegetation) adjacentVeg++;
+                        if (t.type === 'floor' && t.liquids && t.liquids.water > 0) adjacentWater++;
+                    }
+                    if (hasWater) spreadChance = 0.32;
+                    else if (adjacentWater >= 1) spreadChance = 0.24;
+                    else if (damp) spreadChance = 0.2;
+                    if (adjacentVeg >= 2) spreadChance = Math.min(0.45, spreadChance + 0.1);
+                } else if (veg === 'fungus') {
+                    const organic = tile.blood && tile.blood > 0;
+                    let adjacentVeg = 0;
+                    for (const [dx, dy] of dirs) {
+                        const t = this.getTile(x + dx, y + dy);
+                        if (t.type === 'floor' && t.vegetation) adjacentVeg++;
+                    }
+                    if (organic) spreadChance = 0.22;
+                    if (adjacentVeg >= 1) spreadChance = Math.min(0.28, spreadChance + 0.08);
+                }
+                if (Math.random() >= spreadChance) continue;
+                const empty = [];
+                for (const [dx, dy] of dirs) {
+                    const nx = x + dx, ny = y + dy;
+                    const nt = this.getTile(nx, ny);
+                    if (nt.type === 'floor' && !nt.vegetation) empty.push({ x: nx, y: ny });
+                }
+                if (empty.length === 0) continue;
+                const pick = empty[Math.floor(Math.random() * empty.length)];
+                this.tiles[pick.y][pick.x].vegetation = veg;
+            }
+        }
+    }
+
+    /**
+     * Generate rooms - Varied sizes and irregular placement.
+     * Room count and sizes scale with map dimensions (based on 80x50 reference).
      */
     generateRooms() {
-        const numRooms = 8 + Math.floor(Math.random() * 5); // 8-12 rooms
-        const maxAttempts = 150;
-        
+        const { linearScale, roomScale } = this.getMapScale();
+        const numRooms = Math.max(8, Math.floor((8 + Math.floor(Math.random() * 5)) * Math.min(linearScale, 3)));
+        const maxAttempts = Math.min(400, 100 + numRooms * 15);
+
         for (let i = 0; i < numRooms; i++) {
             let attempts = 0;
             let roomPlaced = false;
-            
+
             while (attempts < maxAttempts && !roomPlaced) {
-                // More varied room sizes - including small chambers
                 let roomWidth, roomHeight;
-                
                 if (Math.random() < 0.3) {
-                    // Small chambers (30% chance)
-                    roomWidth = 3 + Math.floor(Math.random() * 3); // 3-5
-                    roomHeight = 3 + Math.floor(Math.random() * 3); // 3-5
+                    roomWidth = Math.max(3, Math.floor((3 + Math.floor(Math.random() * 3)) * roomScale));
+                    roomHeight = Math.max(3, Math.floor((3 + Math.floor(Math.random() * 3)) * roomScale));
                 } else if (Math.random() < 0.6) {
-                    // Medium rooms (30% chance)
-                    roomWidth = 5 + Math.floor(Math.random() * 4); // 5-8
-                    roomHeight = 4 + Math.floor(Math.random() * 4); // 4-7
+                    roomWidth = Math.max(4, Math.floor((5 + Math.floor(Math.random() * 4)) * roomScale));
+                    roomHeight = Math.max(4, Math.floor((4 + Math.floor(Math.random() * 4)) * roomScale));
                 } else {
-                    // Large rooms (40% chance)
-                    roomWidth = 7 + Math.floor(Math.random() * 6); // 7-12
-                    roomHeight = 5 + Math.floor(Math.random() * 5); // 5-9
+                    roomWidth = Math.max(5, Math.floor((7 + Math.floor(Math.random() * 6)) * roomScale));
+                    roomHeight = Math.max(4, Math.floor((5 + Math.floor(Math.random() * 5)) * roomScale));
                 }
-                
-                // Reduce margin for more cramped, maze-like feel
-                const marginX = Math.floor(this.width * 0.08);  // 8% margin  
-                const marginY = Math.floor(this.height * 0.08); // 8% margin
+
+                const marginX = Math.floor(this.width * 0.08);
+                const marginY = Math.floor(this.height * 0.08);
                 const roomX = marginX + Math.floor(Math.random() * (this.width - roomWidth - marginX * 2));
                 const roomY = marginY + Math.floor(Math.random() * (this.height - roomHeight - marginY * 2));
                 
@@ -341,7 +477,8 @@ class Dungeon {
                         y: roomY,
                         width: roomWidth,
                         height: roomHeight,
-                        type: i === 0 ? 'start' : 'normal' // Mark starting room
+                        type: i === 0 ? 'start' : 'normal',
+                        biome: i === 0 ? 'start' : this.pickRoomBiome()
                     };
                     
                     this.rooms.push(room);
@@ -374,6 +511,30 @@ class Dungeon {
         
         return true;
     }
+
+    /**
+     * Pick a random room biome for environmental diversity.
+     */
+    pickRoomBiome() {
+        const roll = Math.random();
+        if (roll < 0.18) return 'damp';
+        if (roll < 0.32) return 'flooded';
+        if (roll < 0.45) return 'grove';
+        if (roll < 0.58) return 'crypt';
+        if (roll < 0.70) return 'cave';
+        if (roll < 0.82) return 'barracks';
+        return 'normal';
+    }
+
+    /**
+     * Get the room containing tile (x, y), or null.
+     */
+    getRoomAt(x, y) {
+        for (const room of this.rooms) {
+            if (x >= room.x && x < room.x + room.width && y >= room.y && y < room.y + room.height) return room;
+        }
+        return null;
+    }
     
     /**
      * Carve out a room
@@ -387,18 +548,16 @@ class Dungeon {
     }
     
     /**
-     * Connect rooms - simple sequential method
+     * Connect rooms - sequential plus extra connections scaled by map size
      */
     connectRooms() {
         if (this.rooms.length < 2) return;
-        
-        // Connect each room to the next one - guaranteed connectivity
+        const { linearScale } = this.getMapScale();
+
         for (let i = 0; i < this.rooms.length - 1; i++) {
             this.createCorridor(this.rooms[i], this.rooms[i + 1]);
         }
-        
-        // Optionally add one or two extra connections for variety
-        const extraConnections = Math.floor(Math.random() * 3); // 0-2 extra
+        const extraConnections = Math.min(this.rooms.length * 2, Math.floor((2 + Math.random() * 4) * linearScale));
         for (let i = 0; i < extraConnections && this.rooms.length > 2; i++) {
             const room1 = this.rooms[Math.floor(Math.random() * this.rooms.length)];
             const room2 = this.rooms[Math.floor(Math.random() * this.rooms.length)];
@@ -467,30 +626,29 @@ class Dungeon {
     }
     
     /**
-     * Add maze-like passages between rooms
+     * Add maze-like passages between rooms (count and length scale with map size)
      */
     addMazePassages() {
-        const numPassages = 3 + Math.floor(Math.random() * 4); // 3-6 extra passages
-        
+        const { linearScale } = this.getMapScale();
+        const numPassages = Math.min(25, Math.max(3, Math.floor((3 + Math.random() * 4) * linearScale)));
         for (let i = 0; i < numPassages; i++) {
             this.createWindingPassage();
         }
     }
-    
+
     /**
      * Create a winding passage for maze-like feel
      */
     createWindingPassage() {
-        // Start from a random room edge
         if (this.rooms.length === 0) return;
-        
+        const { roomScale } = this.getMapScale();
         const room = this.rooms[Math.floor(Math.random() * this.rooms.length)];
         const startX = room.x + Math.floor(Math.random() * room.width);
         const startY = room.y + Math.floor(Math.random() * room.height);
-        
         let x = startX;
         let y = startY;
-        const maxLength = 15 + Math.floor(Math.random() * 10); // 15-24 tiles
+        const baseLength = 15 + Math.floor(Math.random() * 10);
+        const maxLength = Math.max(baseLength, Math.floor(baseLength * roomScale));
         
         for (let step = 0; step < maxLength; step++) {
             // Random walk with bias towards uncarved areas
@@ -536,11 +694,11 @@ class Dungeon {
     }
     
     /**
-     * Add secret rooms for exploration
+     * Add secret rooms for exploration (count scales with map size)
      */
     addSecretRooms() {
-        const numSecretRooms = 1 + Math.floor(Math.random() * 3); // 1-3 secret rooms
-        
+        const { linearScale } = this.getMapScale();
+        const numSecretRooms = Math.min(8, Math.max(1, Math.floor((1 + Math.random() * 3) * linearScale)));
         for (let i = 0; i < numSecretRooms; i++) {
             this.createSecretRoom();
         }
@@ -550,13 +708,12 @@ class Dungeon {
      * Create a secret room connected by a single passage
      */
     createSecretRoom() {
-        const maxAttempts = 50;
-        
+        const { refW, refH, roomScale, linearScale } = this.getMapScale();
+        const maxAttempts = Math.min(200, Math.floor(80 * linearScale));
+
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            // Small secret room
-            const roomWidth = 3 + Math.floor(Math.random() * 3); // 3-5
-            const roomHeight = 3 + Math.floor(Math.random() * 3); // 3-5
-            
+            const roomWidth = Math.max(3, Math.floor((3 + Math.floor(Math.random() * 3)) * roomScale));
+            const roomHeight = Math.max(3, Math.floor((3 + Math.floor(Math.random() * 3)) * roomScale));
             const roomX = 2 + Math.floor(Math.random() * (this.width - roomWidth - 4));
             const roomY = 2 + Math.floor(Math.random() * (this.height - roomHeight - 4));
             
@@ -923,35 +1080,33 @@ class Dungeon {
     }
     
     /**
-     * Add dead ends for exploration mystery
+     * Add dead ends for exploration mystery (count and length scale with map size)
      */
     addDeadEnds() {
-        const numDeadEnds = 2 + Math.floor(Math.random() * 4); // 2-5 dead ends
-        
+        const { linearScale } = this.getMapScale();
+        const numDeadEnds = Math.min(16, Math.max(2, Math.floor((2 + Math.random() * 4) * linearScale)));
         for (let i = 0; i < numDeadEnds; i++) {
             this.createDeadEnd();
         }
     }
-    
+
     /**
      * Create a dead end passage
      */
     createDeadEnd() {
-        // Find a random floor tile that's not in a room
+        const { linearScale, roomScale } = this.getMapScale();
         let startX, startY;
         let attempts = 0;
-        
+        const maxAttempts = Math.min(150, Math.floor(50 * linearScale));
         do {
             startX = 1 + Math.floor(Math.random() * (this.width - 2));
             startY = 1 + Math.floor(Math.random() * (this.height - 2));
             attempts++;
-        } while (attempts < 50 && 
+        } while (attempts < maxAttempts &&
                  (this.getTile(startX, startY).type !== 'floor' || this.isInRoom(startX, startY)));
-        
-        if (attempts >= 50) return;
-        
-        // Create a short dead end
-        const length = 3 + Math.floor(Math.random() * 5); // 3-7 tiles
+        if (attempts >= maxAttempts) return;
+        const baseLength = 3 + Math.floor(Math.random() * 5);
+        const length = Math.max(baseLength, Math.floor(baseLength * roomScale));
         const direction = Math.floor(Math.random() * 4);
         const directions = [
             { dx: 0, dy: -1 }, // North

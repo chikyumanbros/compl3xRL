@@ -437,6 +437,11 @@
         
         // 経験値システムは廃止したので EXP は付与しない
 
+        // Drop inventory and equipment from intelligent monsters
+        if (this.dropMonsterItems && typeof this.dropMonsterItems === 'function') {
+            this.dropMonsterItems(monster);
+        }
+
         // Chance to leave a corpse based on death cause and monster type
         if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
             const corpseChance = this.calculateCorpseChance(monster, cause);
@@ -519,6 +524,9 @@
                 break;
             case 'DoT':
                 baseChance = 0.5; // Status effects can deteriorate the body
+                break;
+            case 'monster':
+                baseChance = 0.6; // Monster-on-monster kill (ecosystem)
                 break;
             default:
                 baseChance = 0.7;

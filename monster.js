@@ -50,6 +50,11 @@ class Monster {
         // Pack/group metadata
         this.packId = null; // Numeric or string identifier for pack membership
         this.packType = 'solitary'; // 'swarm' | 'pack' | 'group' | 'pair' | 'solitary'
+
+        // Intelligent creatures: inventory and equipment (pick up / use / equip)
+        this.inventory = [];
+        this.maxInventorySize = 8;
+        this.equipment = { weapon: null, armor: null };
     }
     
     /**
@@ -202,7 +207,162 @@ class Monster {
                 minDepth: 1,
                 maxDepth: 3
             },
-            
+            // Ecosystem: prey / detritivore (dungeon diversity)
+            'cave_fish': {
+                name: 'Cave Fish',
+                symbol: 'f',
+                color: 'monster',
+                maxHp: 2,
+                toHit: 1,
+                armorClass: 15,
+                damage: 0,
+                weaponDamage: 1,
+                penetration: 0,
+                exp: 0,
+                minDepth: 1,
+                maxDepth: 6
+            },
+            'slime': {
+                name: 'Slime',
+                symbol: '~',
+                color: 'monster',
+                maxHp: 4,
+                toHit: 2,
+                armorClass: 14,
+                damage: 0,
+                weaponDamage: 2,
+                penetration: 0,
+                exp: 1,
+                minDepth: 1,
+                maxDepth: 5
+            },
+            'cave_beetle': {
+                name: 'Cave Beetle',
+                symbol: 'q',
+                color: 'monster',
+                maxHp: 3,
+                toHit: 2,
+                armorClass: 14,
+                damage: 0,
+                weaponDamage: 2,
+                penetration: 0,
+                exp: 0,
+                minDepth: 1,
+                maxDepth: 5
+            },
+            'cave_moth': {
+                name: 'Cave Moth',
+                symbol: 'm',
+                color: 'monster',
+                maxHp: 2,
+                toHit: 1,
+                armorClass: 15,
+                damage: 0,
+                weaponDamage: 1,
+                penetration: 0,
+                exp: 0,
+                minDepth: 1,
+                maxDepth: 4
+            },
+            'glow_worm': {
+                name: 'Glow Worm',
+                symbol: 'i',
+                color: 'monster',
+                maxHp: 2,
+                toHit: 1,
+                armorClass: 15,
+                damage: 0,
+                weaponDamage: 1,
+                penetration: 0,
+                exp: 0,
+                minDepth: 1,
+                maxDepth: 5
+            },
+            'cave_cricket': {
+                name: 'Cave Cricket',
+                symbol: ';',
+                color: 'monster',
+                maxHp: 3,
+                toHit: 2,
+                armorClass: 14,
+                damage: 0,
+                weaponDamage: 2,
+                penetration: 0,
+                exp: 0,
+                minDepth: 1,
+                maxDepth: 5
+            },
+            'blind_salamander': {
+                name: 'Blind Cave Salamander',
+                symbol: 'A',
+                color: 'monster',
+                maxHp: 4,
+                toHit: 2,
+                armorClass: 13,
+                damage: 0,
+                weaponDamage: 2,
+                penetration: 0,
+                exp: 1,
+                minDepth: 2,
+                maxDepth: 6
+            },
+            'mushroom_spore': {
+                name: 'Mushroom Spore Cluster',
+                symbol: '"',
+                color: 'monster',
+                maxHp: 2,
+                toHit: 1,
+                armorClass: 16,
+                damage: 0,
+                weaponDamage: 1,
+                penetration: 0,
+                exp: 0,
+                minDepth: 1,
+                maxDepth: 4
+            },
+            'shrew': {
+                name: 'Cave Shrew',
+                symbol: 's',
+                color: 'monster',
+                maxHp: 2,
+                toHit: 1,
+                armorClass: 16,
+                damage: 0,
+                weaponDamage: 1,
+                penetration: 0,
+                exp: 0,
+                minDepth: 1,
+                maxDepth: 3
+            },
+            'frog': {
+                name: 'Cave Frog',
+                symbol: 'F',
+                color: 'monster',
+                maxHp: 3,
+                toHit: 1,
+                armorClass: 14,
+                damage: 0,
+                weaponDamage: 2,
+                penetration: 0,
+                exp: 0,
+                minDepth: 1,
+                maxDepth: 4
+            },
+            'cave_snail': {
+                name: 'Cave Snail',
+                symbol: '@',
+                color: 'monster',
+                maxHp: 3,
+                toHit: 0,
+                armorClass: 17,
+                damage: 0,
+                weaponDamage: 1,
+                penetration: 0,
+                exp: 0,
+                minDepth: 1,
+                maxDepth: 5
+            },
+
             // === MID-EARLY DEPTHS (2-5) ===
             'goblin': {
                 name: 'Goblin',
@@ -346,6 +506,48 @@ class Monster {
                 minDepth: 2,
                 maxDepth: 6
             },
+            'scorpion': {
+                name: 'Giant Scorpion',
+                symbol: 'c',
+                color: 'monster',
+                maxHp: 10,
+                toHit: 5,
+                armorClass: 13,
+                damage: 0,
+                weaponDamage: 5,
+                penetration: 1,
+                exp: 2,
+                minDepth: 2,
+                maxDepth: 6
+            },
+            'stirge': {
+                name: 'Stirge',
+                symbol: 't',
+                color: 'monster',
+                maxHp: 4,
+                toHit: 4,
+                armorClass: 14,
+                damage: 0,
+                weaponDamage: 2,
+                penetration: 0,
+                exp: 1,
+                minDepth: 2,
+                maxDepth: 5
+            },
+            'giant_frog': {
+                name: 'Giant Frog',
+                symbol: 'P',
+                color: 'monster',
+                maxHp: 12,
+                toHit: 4,
+                armorClass: 11,
+                damage: 0,
+                weaponDamage: 5,
+                penetration: 0,
+                exp: 2,
+                minDepth: 3,
+                maxDepth: 6
+            },
             
             // === MID DEPTHS (4-8) ===
             'lizardman': {
@@ -389,6 +591,20 @@ class Monster {
                 exp: 18,
                 minDepth: 5,
                 maxDepth: 11
+            },
+            'carrion_crow': {
+                name: 'Carrion Crow',
+                symbol: 'W',
+                color: 'monster',
+                maxHp: 8,
+                toHit: 5,
+                armorClass: 13,
+                damage: 0,
+                weaponDamage: 3,
+                penetration: 0,
+                exp: 1,
+                minDepth: 4,
+                maxDepth: 8
             },
             'bear': {
                 name: 'Brown Bear',
@@ -762,13 +978,30 @@ class Monster {
                 maxDepth: 99
             }
         };
-        
+
+        // Per-species colors (hex) so same symbol can distinguish by color
+        const MONSTER_COLORS = {
+            newt: '#70c070', bat: '#b0b0d0', rat: '#a08060', spider: '#806050', kobold: '#c08040',
+            ant: '#a06030', centipede: '#8b7355', jackal: '#c4a060', gecko: '#60a060', cave_fish: '#60a0c0',
+            slime: '#80c080', cave_beetle: '#6b8e23', cave_moth: '#b8860b', glow_worm: '#daa520', cave_cricket: '#8b7355',
+            blind_salamander: '#8fbc8f', mushroom_spore: '#9acd32', shrew: '#808060', frog: '#3cb371', cave_snail: '#bc8f8f',
+            goblin: '#90c090', orc: '#80a060', wolf: '#c0c0c0', skeleton: '#88ccdd', zombie: '#6b8e6b',
+            dwarf: '#daa520', elf: '#98fb98', floating_eye: '#ffb6c1', leprechaun: '#ffd700', snake: '#228b22',
+            scorpion: '#cd5c5c', stirge: '#8b0000', giant_frog: '#2e8b57', lizardman: '#2e8b57', hobgoblin: '#9acd32',
+            gnoll: '#cd853f', carrion_crow: '#4a4a4a', bear: '#8b4513', centaur: '#daa520', wraith: '#add8e6',
+            nymph: '#ffc0cb', unicorn: '#ffffff', stalker: '#2f4f4f', yeti: '#e0e0e0', ogre: '#808060',
+            troll: '#808080', minotaur: '#8b4513', vampire: '#8b0000', xorn: '#696969', rust_monster: '#a0522d',
+            umber_hulk: '#4a3728', invisible_stalker: '#708090', ettin: '#a08060', wyvern: '#4682b4',
+            giant: '#d2b48c', dragon: '#b22222', lich: '#e0ffff', balrog: '#8b0000', jabberwock: '#2e8b57',
+            medusa: '#9370db', sphinx: '#daa520', purple_worm: '#4b0082', frost_giant: '#b0e0e6'
+        };
+
         const stats = monsterTypes[type] || monsterTypes['kobold'];
-        
+        this.color = MONSTER_COLORS[type] || (stats.color && stats.color.startsWith('#') ? stats.color : '#ffffff');
+
         // Set monster properties
         this.name = stats.name;
         this.symbol = stats.symbol;
-        this.color = stats.color;
         this.maxHp = stats.maxHp;
         this.toHit = stats.toHit;
         this.armorClass = stats.armorClass;
@@ -922,7 +1155,8 @@ class MonsterSpawner {
         const maxMonstersInRoom = 8; // Prevent room overcrowding
         
         for (let attempt = 0; attempt < spawnAttempts && spawnedCount < maxMonstersInRoom; attempt++) {
-            const monsterType = this.getRandomMonsterType(currentDepth);
+            const biome = (room && room.biome && room.biome !== 'start') ? room.biome : null;
+            const monsterType = this.getRandomMonsterType(currentDepth, biome);
             const packBehavior = this.getPackBehavior(monsterType);
             
             // Check if this monster should spawn as a pack
@@ -1181,9 +1415,27 @@ class MonsterSpawner {
     }
     
     /**
-     * Get random monster type based on current depth
+     * Biome-based spawn multiplier for environmental diversity (1 = neutral).
      */
-    getRandomMonsterType(currentDepth = 1) {
+    getBiomeSpawnMultiplier(type, biome) {
+        if (!biome) return 1;
+        const table = {
+            flooded: { cave_fish: 4, slime: 3, blind_salamander: 2, frog: 3, giant_frog: 2 },
+            damp: { slime: 2.5, cave_fish: 2, cave_beetle: 1.5, frog: 2, cave_snail: 2, giant_frog: 1.5 },
+            grove: { cave_beetle: 2, cave_cricket: 2, gecko: 2, rat: 1.5, cave_moth: 1.5, shrew: 2, cave_snail: 1.5 },
+            crypt: { skeleton: 3, zombie: 3, spider: 2, mushroom_spore: 2, wraith: 1.5, scorpion: 2, carrion_crow: 2 },
+            barracks: { kobold: 2, goblin: 2, orc: 2, dwarf: 2, hobgoblin: 1.5, elf: 1.3, carrion_crow: 1.5 },
+            cave: { bat: 2.5, cave_moth: 2, glow_worm: 2, centipede: 1.5, scorpion: 2, shrew: 1.5, stirge: 1.5 }
+        };
+        const row = table[biome];
+        if (!row || row[type] === undefined) return 1;
+        return row[type];
+    }
+
+    /**
+     * Get random monster type based on current depth and optional room biome.
+     */
+    getRandomMonsterType(currentDepth = 1, biome = null) {
         // Get all monster types that can appear at this depth
         const availableTypes = [];
         const monsterTypes = {
@@ -1197,7 +1449,18 @@ class MonsterSpawner {
             'centipede': { minDepth: 1, maxDepth: 5 },
             'jackal': { minDepth: 1, maxDepth: 4 },
             'gecko': { minDepth: 1, maxDepth: 3 },
-            
+            'cave_fish': { minDepth: 1, maxDepth: 6 },
+            'slime': { minDepth: 1, maxDepth: 5 },
+            'cave_beetle': { minDepth: 1, maxDepth: 5 },
+            'cave_moth': { minDepth: 1, maxDepth: 4 },
+            'glow_worm': { minDepth: 1, maxDepth: 5 },
+            'cave_cricket': { minDepth: 1, maxDepth: 5 },
+            'blind_salamander': { minDepth: 2, maxDepth: 6 },
+            'mushroom_spore': { minDepth: 1, maxDepth: 4 },
+            'shrew': { minDepth: 1, maxDepth: 3 },
+            'frog': { minDepth: 1, maxDepth: 4 },
+            'cave_snail': { minDepth: 1, maxDepth: 5 },
+
             // Mid-early depths (2-5)
             'goblin': { minDepth: 2, maxDepth: 6 },
             'orc': { minDepth: 2, maxDepth: 7 },
@@ -1209,11 +1472,15 @@ class MonsterSpawner {
             'floating_eye': { minDepth: 2, maxDepth: 6 },
             'leprechaun': { minDepth: 3, maxDepth: 7 },
             'snake': { minDepth: 2, maxDepth: 6 },
+            'scorpion': { minDepth: 2, maxDepth: 6 },
+            'stirge': { minDepth: 2, maxDepth: 5 },
+            'giant_frog': { minDepth: 3, maxDepth: 6 },
             
             // Mid depths (4-8)
             'lizardman': { minDepth: 4, maxDepth: 9 },
             'hobgoblin': { minDepth: 4, maxDepth: 10 },
             'gnoll': { minDepth: 5, maxDepth: 11 },
+            'carrion_crow': { minDepth: 4, maxDepth: 8 },
             'bear': { minDepth: 5, maxDepth: 12 },
             'centaur': { minDepth: 5, maxDepth: 11 },
             'wraith': { minDepth: 6, maxDepth: 12 },
@@ -1246,26 +1513,24 @@ class MonsterSpawner {
             'frost_giant': { minDepth: 15, maxDepth: 99 }
         };
         
-        // Filter monsters that can appear at current depth
+        // Build weighted list: depth-valid types with spawn weight and biome multiplier
+        const weighted = [];
         for (const [type, data] of Object.entries(monsterTypes)) {
-            if (currentDepth >= data.minDepth && currentDepth <= data.maxDepth) {
-                // Calculate spawn weight based on depth curve
-                let weight = this.calculateSpawnWeight(type, currentDepth, data);
-                
-                // Add multiple instances based on weight
-                for (let i = 0; i < weight; i++) {
-                    availableTypes.push(type);
-                }
-            }
+            if (currentDepth < data.minDepth || currentDepth > data.maxDepth) continue;
+            let weight = this.calculateSpawnWeight(type, currentDepth, data);
+            if (biome) weight *= this.getBiomeSpawnMultiplier(type, biome);
+            if (weight <= 0) continue;
+            weighted.push({ type, weight });
         }
-        
-        // Fallback to kobold if no monsters available (shouldn't happen)
-        if (availableTypes.length === 0) {
 
-            return 'kobold';
+        if (weighted.length === 0) return 'kobold';
+        const total = weighted.reduce((s, e) => s + e.weight, 0);
+        let r = Math.random() * total;
+        for (const { type, weight } of weighted) {
+            r -= weight;
+            if (r <= 0) return type;
         }
-        
-        return availableTypes[Math.floor(Math.random() * availableTypes.length)];
+        return weighted[weighted.length - 1].type;
     }
     
     /**
@@ -1277,7 +1542,7 @@ class MonsterSpawner {
         const depthPosition = currentDepth - minDepth + 1;
         
         // Weight distribution patterns by monster category
-        const earlyMonsters = ['newt', 'bat', 'rat', 'spider', 'ant', 'gecko', 'jackal'];
+        const earlyMonsters = ['newt', 'bat', 'rat', 'spider', 'ant', 'gecko', 'jackal', 'cave_fish', 'slime', 'cave_beetle', 'cave_moth', 'glow_worm', 'cave_cricket', 'blind_salamander', 'mushroom_spore'];
         const commonMonsters = ['kobold', 'goblin', 'orc', 'wolf', 'skeleton', 'zombie', 'centipede', 'dwarf', 'elf', 'floating_eye', 'leprechaun', 'snake'];
         const midMonsters = ['lizardman', 'hobgoblin', 'gnoll', 'bear', 'centaur', 'nymph', 'stalker', 'yeti'];
         const lateMonsters = ['ogre', 'troll', 'minotaur', 'vampire', 'xorn', 'rust_monster', 'umber_hulk', 'invisible_stalker', 'ettin'];
@@ -1372,7 +1637,23 @@ class MonsterSpawner {
             'rust_monster': { type: 'pair', minSize: 1, maxSize: 2, spacing: 'loose', packChance: 0.3 },
             'umber_hulk': { type: 'solitary', minSize: 1, maxSize: 1, spacing: 'alone', packChance: 0.0 },
             'yeti': { type: 'pair', minSize: 1, maxSize: 2, spacing: 'loose', packChance: 0.3 },
-            'newt': { type: 'pair', minSize: 1, maxSize: 2, spacing: 'tight', packChance: 0.5 }
+            'newt': { type: 'pair', minSize: 1, maxSize: 2, spacing: 'tight', packChance: 0.5 },
+            // Ecosystem prey / detritivore
+            'cave_fish': { type: 'swarm', minSize: 2, maxSize: 5, spacing: 'loose', packChance: 0.6 },
+            'slime': { type: 'pair', minSize: 1, maxSize: 2, spacing: 'loose', packChance: 0.4 },
+            'cave_beetle': { type: 'swarm', minSize: 2, maxSize: 6, spacing: 'tight', packChance: 0.7 },
+            'cave_moth': { type: 'swarm', minSize: 2, maxSize: 5, spacing: 'loose', packChance: 0.5 },
+            'glow_worm': { type: 'swarm', minSize: 2, maxSize: 5, spacing: 'tight', packChance: 0.6 },
+            'cave_cricket': { type: 'swarm', minSize: 2, maxSize: 5, spacing: 'loose', packChance: 0.6 },
+            'blind_salamander': { type: 'pair', minSize: 1, maxSize: 2, spacing: 'loose', packChance: 0.4 },
+            'mushroom_spore': { type: 'swarm', minSize: 2, maxSize: 4, spacing: 'tight', packChance: 0.5 },
+            'shrew': { type: 'swarm', minSize: 3, maxSize: 6, spacing: 'tight', packChance: 0.7 },
+            'frog': { type: 'swarm', minSize: 2, maxSize: 5, spacing: 'loose', packChance: 0.5 },
+            'cave_snail': { type: 'solitary', minSize: 1, maxSize: 1, spacing: 'alone', packChance: 0.0 },
+            'scorpion': { type: 'pair', minSize: 1, maxSize: 2, spacing: 'loose', packChance: 0.4 },
+            'stirge': { type: 'swarm', minSize: 2, maxSize: 5, spacing: 'loose', packChance: 0.6 },
+            'giant_frog': { type: 'pair', minSize: 1, maxSize: 2, spacing: 'loose', packChance: 0.3 },
+            'carrion_crow': { type: 'pair', minSize: 1, maxSize: 3, spacing: 'loose', packChance: 0.5 }
         };
     }
     
@@ -1641,6 +1922,83 @@ class MonsterSpawner {
         return this.monsters.filter(monster => monster.isAlive);
     }
     
+    /**
+     * Find an empty walkable tile adjacent to (x, y). Excludes player and other monsters.
+     */
+    findAdjacentEmptyTile(x, y, playerX, playerY) {
+        const dirs = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+        const shuffled = dirs.slice().sort(() => Math.random() - 0.5);
+        for (const [dx, dy] of shuffled) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (!this.dungeon.isInBounds(nx, ny) || !this.dungeon.isWalkable(nx, ny)) continue;
+            if (playerX !== undefined && playerY !== undefined && nx === playerX && ny === playerY) continue;
+            if (this.getMonsterAt(nx, ny)) continue;
+            return { x: nx, y: ny };
+        }
+        return null;
+    }
+
+    /**
+     * Process breeding: creatures that meet conditions can spawn offspring. Called periodically by game.
+     */
+    processReproduction(game) {
+        if (!game || typeof Ecosystem === 'undefined' || !Ecosystem.canBreed || !Ecosystem.getBreedChance) return;
+        const turnCount = (game.player && game.player.turnCount != null) ? game.player.turnCount : 0;
+        const currentDepth = game.currentLevel != null ? game.currentLevel : 1;
+        const playerX = game.player ? game.player.x : undefined;
+        const playerY = game.player ? game.player.y : undefined;
+        const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+
+        const living = this.getLivingMonsters().slice().sort(() => Math.random() - 0.5);
+        for (const monster of living) {
+            const mx = monster.x;
+            const my = monster.y;
+            let sameSpeciesAdjacent = 0;
+            let hasVegetationNearby = false;
+            let hasCorpseNearby = false;
+
+            const tile = this.dungeon.getTile(mx, my);
+            if (tile && tile.vegetation) hasVegetationNearby = true;
+            if (game.itemManager && typeof game.itemManager.getItemsAt === 'function') {
+                const itemsHere = game.itemManager.getItemsAt(mx, my) || [];
+                if (itemsHere.some(it => it.type === 'corpse')) hasCorpseNearby = true;
+            }
+            for (const [dx, dy] of dirs) {
+                const tx = mx + dx;
+                const ty = my + dy;
+                const t = this.dungeon.getTile(tx, ty);
+                if (t && t.type === 'floor' && t.vegetation) hasVegetationNearby = true;
+                const other = this.getMonsterAt(tx, ty);
+                if (other && other !== monster && other.type === monster.type) sameSpeciesAdjacent++;
+                if (game.itemManager && typeof game.itemManager.getItemsAt === 'function') {
+                    const itemsThere = game.itemManager.getItemsAt(tx, ty) || [];
+                    if (itemsThere.some(it => it.type === 'corpse')) hasCorpseNearby = true;
+                }
+            }
+
+            if (!Ecosystem.canBreed(monster, turnCount, sameSpeciesAdjacent, hasVegetationNearby, hasCorpseNearby)) continue;
+            if (Math.random() >= Ecosystem.getBreedChance(monster.type)) continue;
+
+            const childPos = this.findAdjacentEmptyTile(mx, my, playerX, playerY);
+            if (!childPos) continue;
+
+            monster._lastBredTurn = turnCount;
+            this.spawnSingleMonster(childPos.x, childPos.y, monster.type, currentDepth);
+            if (game.renderer) {
+                if (game.fov && game.fov.isVisible(childPos.x, childPos.y)) {
+                    game.renderer.addLogMessage(`${monster.name} offspring appears!`);
+                } else if (playerX != null && playerY != null && game.player) {
+                    const dist = Math.max(Math.abs(childPos.x - playerX), Math.abs(childPos.y - playerY));
+                    if (dist <= 6 && Math.random() < 0.4) {
+                        game.renderer.addLogMessage('Something stirs in the shadows...');
+                    }
+                }
+            }
+            break;
+        }
+    }
+
     /**
      * Remove dead monsters
      */

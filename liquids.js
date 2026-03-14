@@ -25,8 +25,17 @@ const Liquids = (function() {
             evaporateChance: 0.2,
             spreadChance: 0.15,
             spreadThreshold: 3
+        },
+        /** Groundwater / flooding: persists, spreads to adjacent floor (seepage, flood) */
+        water: {
+            maxWet: 15,
+            evaporateChance: 0,
+            spreadChance: 0.22,
+            spreadThreshold: 2,
+            /** Optional: slip when wading (e.g. 0.02 per unit, cap 20%) */
+            slipChancePerUnit: 0.02,
+            slipChanceCap: 0.2
         }
-        // Future: water, acid, oil, etc.
     };
 
     function getConfig(type) {

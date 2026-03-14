@@ -13,10 +13,11 @@
         let speed = 100;
         const fastFlyers = ['bat', 'hawk', 'eagle'];
         if (fastFlyers.includes(type)) speed = 120;
-        const quickCreatures = ['rat', 'gecko', 'newt'];
+        const quickCreatures = ['rat', 'gecko', 'newt', 'stirge', 'shrew'];
         if (quickCreatures.includes(type)) speed = 110;
-        const slowCreatures = ['bear', 'troll', 'giant'];
-        if (slowCreatures.includes(type)) speed = 80;
+        if (type === 'stirge') speed = 125;
+        const slowCreatures = ['bear', 'troll', 'giant', 'cave_snail'];
+        if (slowCreatures.includes(type)) speed = type === 'cave_snail' ? 55 : 80;
         if (stats.minDepth >= 8) speed = Math.max(speed - 20, 60);
         switch (type) {
             case 'centipede': speed = 130; break;
@@ -24,13 +25,18 @@
             case 'spider': speed = 105; break;
             case 'zombie': speed = 70; break;
             case 'skeleton': speed = 90; break;
+            case 'cave_snail': speed = 55; break;
+            case 'stirge': speed = 125; break;
+            case 'scorpion': speed = 95; break;
+            case 'giant_frog': speed = 100; break;
+            case 'carrion_crow': speed = 110; break;
         }
         return speed;
     };
 
     M.prototype.setIntelligenceByType = function(type, stats) {
-        const mindless = ['ant', 'centipede', 'spider', 'floating_eye', 'rust_monster'];
-        const animals = ['bat', 'rat', 'gecko', 'jackal', 'wolf', 'bear', 'snake', 'wyvern', 'purple_worm'];
+        const mindless = ['ant', 'centipede', 'spider', 'floating_eye', 'rust_monster', 'slime', 'mushroom_spore', 'cave_snail'];
+        const animals = ['bat', 'rat', 'gecko', 'jackal', 'wolf', 'bear', 'snake', 'wyvern', 'purple_worm', 'cave_fish', 'cave_beetle', 'cave_moth', 'glow_worm', 'cave_cricket', 'blind_salamander', 'shrew', 'frog', 'scorpion', 'stirge', 'giant_frog', 'carrion_crow'];
         const normal = ['kobold', 'goblin', 'orc', 'dwarf', 'elf', 'hobgoblin', 'gnoll', 'lizardman', 'centaur'];
         const smart = ['ogre', 'troll', 'minotaur', 'vampire', 'umber_hulk', 'giant', 'ettin', 'medusa'];
         const genius = ['dragon', 'lich', 'balrog', 'jabberwock', 'sphinx', 'frost_giant'];
@@ -365,6 +371,47 @@
             return playerDied;
         } else {
             if (window.game && window.game.renderer) window.game.renderer.addBattleLogMessage(`Miss!`);
+            if (window.game && window.game.noiseSystem) {
+                window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getMonsterActionSound('MONSTER_ATTACK'));
+            }
+            return false;
+        }
+    };
+
+    /**
+     * Monster attacks another monster (ecosystem: predator-prey, rival)
+     * Returns true if target died.
+     */
+    M.prototype.attackMonster = function(targetMonster) {
+        if (!targetMonster || !targetMonster.isAlive) return false;
+        const naturalRoll = Math.floor(Math.random() * 20) + 1;
+        const requiredRoll = targetMonster.armorClass - this.toHit;
+        if (window.game && window.game.renderer && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
+            window.game.renderer.addBattleLogMessage(`${this.name} attacks ${targetMonster.name}! (${naturalRoll} vs ${requiredRoll}+ needed)`);
+        }
+        if (naturalRoll >= requiredRoll) {
+            const baseDamage = this.damage + Math.floor(Math.random() * this.weaponDamage) + 1;
+            let finalDamage = baseDamage;
+            if (naturalRoll === 20) {
+                finalDamage = baseDamage * 2;
+                if (window.game && window.game.renderer && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
+                    window.game.renderer.addBattleLogMessage(`Critical hit! ${finalDamage} damage!`, 'damage');
+                }
+            } else if (window.game && window.game.renderer && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
+                window.game.renderer.addBattleLogMessage(`Hit! ${finalDamage} damage to ${targetMonster.name}.`);
+            }
+            targetMonster.takeDirectDamage(finalDamage);
+            if (window.game && window.game.noiseSystem) {
+                window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getMonsterActionSound('MONSTER_ATTACK'));
+            }
+            if (window.game && window.game.dungeon && finalDamage > 0) {
+                window.game.dungeon.addBlood(targetMonster.x, targetMonster.y, Math.min(5, Math.ceil(finalDamage / 3)));
+            }
+            return !targetMonster.isAlive;
+        } else {
+            if (window.game && window.game.renderer && window.game.fov && window.game.fov.isVisible(this.x, this.y)) {
+                window.game.renderer.addBattleLogMessage(`${this.name} misses ${targetMonster.name}!`);
+            }
             if (window.game && window.game.noiseSystem) {
                 window.game.noiseSystem.makeSound(this.x, this.y, window.game.noiseSystem.getMonsterActionSound('MONSTER_ATTACK'));
             }

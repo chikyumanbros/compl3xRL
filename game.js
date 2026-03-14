@@ -350,6 +350,18 @@ class Game {
         if (this.dungeon && typeof this.dungeon.stepLiquids === 'function') {
             this.dungeon.stepLiquids();
         }
+        // Vegetation growth (moss/lichen/fungus spread under conditions) every 25 turns
+        if (this.dungeon && this.player && this.player.turnCount > 0 && this.player.turnCount % 25 === 0) {
+            if (typeof this.dungeon.stepVegetation === 'function') {
+                this.dungeon.stepVegetation();
+            }
+        }
+        // Creature breeding (conditions: mate, vegetation, cooldown) every 40 turns
+        if (this.monsterSpawner && this.player && this.player.turnCount > 0 && this.player.turnCount % 40 === 0) {
+            if (typeof this.monsterSpawner.processReproduction === 'function') {
+                this.monsterSpawner.processReproduction(this);
+            }
+        }
         // Food aging (ground + inventory)
         this.processFoodAging();
         // Corpse decay -> gas emission
@@ -714,7 +726,9 @@ class Game {
                     if (this.renderer && this.isTileVisible(x, y)) {
                         this.renderer.addLogMessage(`${m.name} is burned!`, 'warning');
                     }
-                    if (typeof m.takeDamage === 'function') {
+                    if (typeof m.takeDirectDamage === 'function') {
+                        m.takeDirectDamage(dmg);
+                    } else if (typeof m.takeDamage === 'function') {
                         m.takeDamage(dmg, 0);
                     } else {
                         m.hp = Math.max(0, (m.hp || 0) - dmg);
@@ -727,6 +741,17 @@ class Game {
         const consumeFlammablesOnTile = (x, y, fireLevel = 0) => {
             const tileTemp = getTemp(x, y);
             let fuel = 0;
+            const tileHere = getTile(x, y);
+
+            // Vegetation (moss, lichen, fungus) burns away on hot tiles
+            if (tileHere && tileHere.type === 'floor' && tileHere.vegetation && tileTemp >= Temperature.FIRE_THRESHOLD) {
+                const vegName = tileHere.vegetation === 'moss' ? 'moss' : tileHere.vegetation === 'lichen' ? 'lichen' : 'fungus';
+                if (this.renderer && this.isTileVisible(x, y)) {
+                    this.renderer.addLogMessage(`The ${vegName} burns away!`, 'warning');
+                }
+                delete tileHere.vegetation;
+                fuel += 1;
+            }
 
             // Ground items (only burn when tile temp >= this item's ignition threshold)
             if (this.itemManager && typeof this.itemManager.getItemsAt === 'function') {
@@ -1052,14 +1077,15 @@ class Game {
                 else this.player.hp = Math.max(0, (this.player.hp || 0) - finalDmg);
             }
 
-            // Monster heat damage
+            // Monster heat damage (all creatures on steam tile)
             if (this.monsterSpawner && typeof this.monsterSpawner.getMonsterAt === 'function') {
                 const m = this.monsterSpawner.getMonsterAt(x, y);
                 if (m && m.isAlive) {
                     if (this.renderer && this.isTileVisible(x, y)) {
                         this.renderer.addLogMessage(`${m.name} is scalded!`, 'warning');
                     }
-                    if (typeof m.takeDamage === 'function') m.takeDamage(base, 0);
+                    if (typeof m.takeDirectDamage === 'function') m.takeDirectDamage(base);
+                    else if (typeof m.takeDamage === 'function') m.takeDamage(base, 0);
                     else {
                         m.hp = Math.max(0, (m.hp || 0) - base);
                         if (m.hp <= 0) m.isAlive = false;
@@ -1136,7 +1162,8 @@ class Game {
                         if (this.renderer && this.isTileVisible(x, y)) {
                             this.renderer.addLogMessage(`${m.name} is freezing!`, 'warning');
                         }
-                        if (typeof m.takeDamage === 'function') m.takeDamage(coldDmg, 0);
+                        if (typeof m.takeDirectDamage === 'function') m.takeDirectDamage(coldDmg);
+                        else if (typeof m.takeDamage === 'function') m.takeDamage(coldDmg, 0);
                         else {
                             m.hp = Math.max(0, (m.hp || 0) - coldDmg);
                             if (m.hp <= 0) m.isAlive = false;
@@ -1156,6 +1183,16 @@ class Game {
                             }
                         }
                     }
+                }
+
+                // Vegetation (moss, lichen, fungus) dies in extreme cold
+                const tileHere = getTile(x, y);
+                if (tileHere && tileHere.type === 'floor' && tileHere.vegetation) {
+                    const vegName = tileHere.vegetation === 'moss' ? 'moss' : tileHere.vegetation === 'lichen' ? 'lichen' : 'fungus';
+                    if (this.renderer && this.isTileVisible(x, y)) {
+                        this.renderer.addLogMessage(`The ${vegName} withers in the cold!`, 'warning');
+                    }
+                    delete tileHere.vegetation;
                 }
             }
         }
@@ -1315,6 +1352,7 @@ class Game {
                     if (this.renderer && this.isTileVisible(monster.x, monster.y)) {
                         this.renderer.addLogMessage(`The ${monster.name} dies from its wounds!`, 'victory');
                     }
+                    this.dropMonsterItems(monster);
                     // 経験値システムは廃止したので EXP は付与しない
                     // Drop corpse for DoT deaths
                     if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
@@ -1375,10 +1413,126 @@ class Game {
             monster.justWokeUp = false; // Clear flag for next turn
             return; // Skip action this turn
         }
+
+        // Intelligent creatures: use healing potion when hurt, then pick up / equip items
+        if (monster.isIntelligent && typeof monster.isIntelligent === 'function' && monster.isIntelligent()) {
+            if (monster.considerUsePotion && monster.considerUsePotion(this)) return;
+            if (monster.considerPickUpItems && monster.considerPickUpItems(this)) return;
+        }
+
+        // Creatures that eat vegetation: graze when standing on moss/lichen/fungus (heal 1, remove vegetation)
+        if (typeof Ecosystem !== 'undefined' && Ecosystem.eatsVegetation && Ecosystem.eatsVegetation(monster.type)) {
+            const tile = this.dungeon.getTile(monster.x, monster.y);
+            if (tile && tile.vegetation) {
+                const vegName = tile.vegetation === 'moss' ? 'moss' : tile.vegetation === 'lichen' ? 'lichen' : 'fungus';
+                delete tile.vegetation;
+                monster.heal(1);
+                if (this.renderer && this.fov && this.fov.isVisible(monster.x, monster.y)) {
+                    this.renderer.addLogMessage(`${monster.name} grazes on the ${vegName}.`);
+                }
+            }
+        }
+
+        // Scavengers: consume adjacent corpse (heal, remove corpse, log)
+        if (typeof Ecosystem !== 'undefined' && Ecosystem.getRole && Ecosystem.ROLES &&
+            Ecosystem.getRole(monster.type) === Ecosystem.ROLES.SCAVENGER && this.itemManager) {
+            const dirs = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+            for (const [dx, dy] of dirs) {
+                const tx = monster.x + dx;
+                const ty = monster.y + dy;
+                const items = this.itemManager.getItemsAt(tx, ty) || [];
+                const corpse = items.find(it => it && it.type === 'corpse');
+                if (corpse) {
+                    this.itemManager.removeItem(corpse);
+                    monster.heal(1 + (Math.random() < 0.4 ? 1 : 0));
+                    if (this.renderer && this.fov && this.fov.isVisible(monster.x, monster.y)) {
+                        this.renderer.addLogMessage(`${monster.name} devours the corpse.`);
+                    }
+                    return;
+                }
+            }
+        }
         
         // Check if monster should flee (Angband-style)
         monster.checkFleeCondition();
-        
+
+        // --- Ecosystem: prey vs predator — flee or fight back (genus-based; prey can counter-attack) ---
+        if (typeof Ecosystem !== 'undefined') {
+            const predator = this.getNearestVisiblePredator(monster, monster.sightRange);
+            if (predator) {
+                const distToPred = Math.max(Math.abs(predator.x - monster.x), Math.abs(predator.y - monster.y));
+                if (distToPred === 1) {
+                    // Adjacent: may fight back instead of only fleeing
+                    const dirs = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+                    let escapeTiles = 0;
+                    for (const [dx, dy] of dirs) {
+                        const nx = monster.x + dx;
+                        const ny = monster.y + dy;
+                        if (!this.dungeon.isInBounds(nx, ny)) continue;
+                        const tile = this.dungeon.getTile(nx, ny);
+                        if (tile.type !== 'floor' && tile.type !== 'door') continue;
+                        if (this.monsterSpawner.getMonsterAt(nx, ny) || (this.player && this.player.x === nx && this.player.y === ny)) continue;
+                        escapeTiles++;
+                    }
+                    const isCornered = escapeTiles < 2;
+                    const fightChance = Ecosystem.getFightBackChance(monster.type, predator.type, isCornered);
+                    if (Math.random() < fightChance) {
+                        const targetDied = monster.attackMonster(predator);
+                        if (targetDied) {
+                            if (this.renderer && this.fov && this.fov.isVisible(monster.x, monster.y)) {
+                                this.renderer.addBattleLogMessage(`${monster.name} fights back and kills the ${predator.name}!`, 'damage');
+                            }
+                            this.dropMonsterItems(predator);
+                            if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
+                                const corpseChance = this.calculateCorpseChance(predator, 'monster');
+                                if (Math.random() < corpseChance) this.itemManager.addCorpse(predator);
+                            }
+                            if (this.dungeon) {
+                                const amount = Math.max(1, Math.min(10, Math.floor((predator.maxHp || 6) / 4)));
+                                this.dungeon.addBlood(predator.x, predator.y, amount);
+                            }
+                        }
+                        return;
+                    }
+                }
+                if (distToPred <= 3) {
+                    this.moveMonsterAwayFrom(monster, predator.x, predator.y);
+                    return;
+                }
+            }
+            // Ecosystem: predator/rival attacks adjacent prey or rival
+            const ecosystemTarget = this.getAdjacentEcosystemTarget(monster);
+            if (ecosystemTarget) {
+                const rel = Ecosystem.getRelationship(monster.type, ecosystemTarget.type);
+                const targetDied = monster.attackMonster(ecosystemTarget);
+                if (targetDied) {
+                    if (this.renderer && this.fov && this.fov.isVisible(monster.x, monster.y)) {
+                        const msg = (rel === 'predator')
+                            ? `The ${monster.name} kills the ${ecosystemTarget.name}!`
+                            : `The ${monster.name} defeats the ${ecosystemTarget.name}!`;
+                        this.renderer.addBattleLogMessage(msg, 'damage');
+                    } else if (this.player && this.fov) {
+                        const dist = Math.max(Math.abs(ecosystemTarget.x - this.player.x), Math.abs(ecosystemTarget.y - this.player.y));
+                        if (dist >= 8 && dist <= 20 && Math.random() < 0.3) {
+                            this.renderer.addLogMessage('You hear a distant shriek.');
+                        }
+                    }
+                    this.dropMonsterItems(ecosystemTarget);
+                    if (this.itemManager && typeof this.itemManager.addCorpse === 'function') {
+                        const corpseChance = this.calculateCorpseChance(ecosystemTarget, 'monster');
+                        if (Math.random() < corpseChance) {
+                            this.itemManager.addCorpse(ecosystemTarget);
+                        }
+                    }
+                    if (this.dungeon) {
+                        const amount = Math.max(1, Math.min(10, Math.floor((ecosystemTarget.maxHp || 6) / 4)));
+                        this.dungeon.addBlood(ecosystemTarget.x, ecosystemTarget.y, amount);
+                    }
+                }
+                return;
+            }
+        }
+
         // Calculate distance to player
         const dx = this.player.x - monster.x;
         const dy = this.player.y - monster.y;
@@ -1392,6 +1546,31 @@ class Game {
             monster.lastSeenPlayerX = this.player.x;
             monster.lastSeenPlayerY = this.player.y;
             monster.turnsWithoutSeeingPlayer = 0;
+
+            // Ecosystem: non-hostile creatures flee from player, but attack when cornered (no escape)
+            if (typeof Ecosystem !== 'undefined' && !Ecosystem.isHostileToPlayer(monster.type)) {
+                if (distance === 1) {
+                    const dirs = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+                    let escapeTiles = 0;
+                    for (const [dx, dy] of dirs) {
+                        const nx = monster.x + dx;
+                        const ny = monster.y + dy;
+                        if (!this.dungeon.isInBounds(nx, ny)) continue;
+                        const tile = this.dungeon.getTile(nx, ny);
+                        if (tile.type !== 'floor' && tile.type !== 'door') continue;
+                        if (this.monsterSpawner.getMonsterAt(nx, ny)) continue;
+                        escapeTiles++;
+                    }
+                    const isCornered = escapeTiles < 2;
+                    if (isCornered && Math.random() < 0.55) {
+                        const playerDied = monster.attackPlayer(this.player);
+                        if (playerDied === true) this.gameOver();
+                        return;
+                    }
+                }
+                this.moveMonsterAwayFrom(monster, this.player.x, this.player.y);
+                return;
+            }
             
             // If monster is fleeing, use personality-based fleeing behavior
             if (monster.isFleeing) {
@@ -1408,6 +1587,18 @@ class Game {
                     return;
                 }
                 return;
+            }
+            
+            // Ecosystem: predator may prefer chasing nearby prey over player
+            if (typeof Ecosystem !== 'undefined' && Ecosystem.prefersPreyOverPlayer(monster.type)) {
+                const prey = this.getNearestVisiblePrey(monster, monster.sightRange);
+                if (prey) {
+                    const distToPrey = Math.max(Math.abs(prey.x - monster.x), Math.abs(prey.y - monster.y));
+                    if (distToPrey <= distance || distToPrey <= 4) {
+                        this.moveMonsterTowards(monster, prey.x, prey.y);
+                        return;
+                    }
+                }
             }
             
             // Move towards player (normal behavior)
@@ -1445,6 +1636,24 @@ class Game {
                 monster.lastSeenPlayerX = null;
                 monster.lastSeenPlayerY = null;
                 monster.turnsWithoutSeeingPlayer = 0;
+                
+                // Ecosystem: predator may chase visible prey when not chasing player
+                if (typeof Ecosystem !== 'undefined' && Ecosystem.prefersPreyOverPlayer(monster.type)) {
+                    const prey = this.getNearestVisiblePrey(monster, monster.sightRange);
+                    if (prey && Math.random() < 0.6) {
+                        this.moveMonsterTowards(monster, prey.x, prey.y);
+                        return;
+                    }
+                }
+
+                // Prey/herbivores/detritivores: sometimes move toward vegetation when idle
+                if (typeof Ecosystem !== 'undefined' && Ecosystem.eatsVegetation(monster.type) && Math.random() < 0.35) {
+                    const veg = this.getNearestVegetationTile(monster, 6);
+                    if (veg) {
+                        this.moveMonsterTowards(monster, veg.x, veg.y);
+                        return;
+                    }
+                }
                 
                 // Corpses and blood attract monsters (scent range similar to noise, but wider)
                 const attractionRange = 15; // Wider than max noise (10) so scent carries far
@@ -2008,6 +2217,113 @@ class Game {
     playerHasCorpse() {
         if (!this.player || !Array.isArray(this.player.inventory)) return false;
         return this.player.inventory.some(item => item && item.type === 'corpse');
+    }
+
+    /**
+     * Ecosystem: get adjacent monster that this monster considers prey or rival (for attack)
+     */
+    getAdjacentEcosystemTarget(monster) {
+        if (typeof Ecosystem === 'undefined') return null;
+        const preyTypes = Ecosystem.getPreyTypes(monster.type);
+        const rivalTypes = (Ecosystem.RIVALS && Ecosystem.RIVALS[monster.type]) ? Ecosystem.RIVALS[monster.type] : [];
+        const canAttack = [...(preyTypes || []), ...(rivalTypes || [])];
+        if (canAttack.length > 0) {
+            for (const [dx, dy] of [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]) {
+                const nx = monster.x + dx;
+                const ny = monster.y + dy;
+                const other = this.monsterSpawner.getMonsterAt(nx, ny);
+                if (other && other.isAlive && canAttack.includes(other.type)) {
+                    const rel = Ecosystem.getRelationship(monster.type, other.type);
+                    if (rel === 'predator' || rel === 'rival') return other;
+                }
+            }
+        }
+        // Scavengers and parasites: attack adjacent wounded (low HP) non-ally
+        const role = Ecosystem.ROLES && Ecosystem.getRole(monster.type);
+        if ((role === Ecosystem.ROLES.SCAVENGER || role === Ecosystem.ROLES.PARASITE) && Ecosystem.ALLIES) {
+            const allies = Ecosystem.ALLIES[monster.type] || [];
+            for (const [dx, dy] of [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]) {
+                const nx = monster.x + dx;
+                const ny = monster.y + dy;
+                const other = this.monsterSpawner.getMonsterAt(nx, ny);
+                if (!other || !other.isAlive || other === monster) continue;
+                if (allies.includes(other.type)) continue;
+                const maxHp = other.maxHp || 1;
+                if (maxHp > 0 && other.hp / maxHp <= 0.3) return other;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Ecosystem: get nearest visible predator of this monster (for fleeing)
+     */
+    getNearestVisiblePredator(monster, maxRange = 8) {
+        if (typeof Ecosystem === 'undefined') return null;
+        const predatorTypes = Ecosystem.getPredatorsOf(monster.type);
+        if (!predatorTypes || predatorTypes.length === 0) return null;
+        const living = this.monsterSpawner.getLivingMonsters();
+        let nearest = null;
+        let nearestDist = maxRange + 1;
+        for (const other of living) {
+            if (!other.isAlive || other === monster) continue;
+            if (!predatorTypes.includes(other.type)) continue;
+            const dist = Math.max(Math.abs(other.x - monster.x), Math.abs(other.y - monster.y));
+            if (dist > maxRange || dist >= nearestDist) continue;
+            if (!this.fov.canSee(monster.x, monster.y, other.x, other.y, maxRange)) continue;
+            nearestDist = dist;
+            nearest = other;
+        }
+        return nearest;
+    }
+
+    /**
+     * Get nearest floor tile with vegetation (for herbivores/prey to gravitate toward)
+     */
+    getNearestVegetationTile(monster, maxRange = 6) {
+        if (!this.dungeon) return null;
+        let best = null;
+        let bestDist = maxRange + 1;
+        const mx = monster.x;
+        const my = monster.y;
+        for (let dy = -maxRange; dy <= maxRange; dy++) {
+            for (let dx = -maxRange; dx <= maxRange; dx++) {
+                const dist = Math.max(Math.abs(dx), Math.abs(dy));
+                if (dist > maxRange || dist === 0) continue;
+                const tx = mx + dx;
+                const ty = my + dy;
+                const tile = this.dungeon.getTile(tx, ty);
+                if (!tile || tile.type !== 'floor' || !tile.vegetation) continue;
+                if (this.monsterSpawner.getMonsterAt(tx, ty) || (this.player && tx === this.player.x && ty === this.player.y)) continue;
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = { x: tx, y: ty };
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Ecosystem: get nearest visible prey for this predator to chase
+     */
+    getNearestVisiblePrey(monster, maxRange = 8) {
+        if (typeof Ecosystem === 'undefined') return null;
+        const preyTypes = Ecosystem.getPreyTypes(monster.type);
+        if (!preyTypes || preyTypes.length === 0) return null;
+        const living = this.monsterSpawner.getLivingMonsters();
+        let nearest = null;
+        let nearestDist = maxRange + 1;
+        for (const other of living) {
+            if (!other.isAlive || other === monster) continue;
+            if (!preyTypes.includes(other.type)) continue;
+            const dist = Math.max(Math.abs(other.x - monster.x), Math.abs(other.y - monster.y));
+            if (dist > maxRange || dist >= nearestDist) continue;
+            if (!this.fov.canSee(monster.x, monster.y, other.x, other.y, maxRange)) continue;
+            nearestDist = dist;
+            nearest = other;
+        }
+        return nearest;
     }
 
     /**
@@ -2702,6 +3018,38 @@ class Game {
         console.log('- debugTerrain.showItems() - Show current items and their locations');
     }
     
+    /**
+     * Drop all items from a dead monster (inventory + equipment) onto the floor at its position
+     */
+    dropMonsterItems(monster) {
+        if (!monster || !this.itemManager) return;
+        const x = monster.x;
+        const y = monster.y;
+        const toDrop = [];
+        if (monster.inventory && monster.inventory.length > 0) {
+            toDrop.push(...monster.inventory);
+            monster.inventory.length = 0;
+        }
+        if (monster.equipment) {
+            if (monster.equipment.weapon) {
+                toDrop.push(monster.equipment.weapon);
+                monster.equipment.weapon = null;
+            }
+            if (monster.equipment.armor) {
+                toDrop.push(monster.equipment.armor);
+                monster.equipment.armor = null;
+            }
+        }
+        for (const item of toDrop) {
+            item.x = x;
+            item.y = y;
+            this.itemManager.addItem(item);
+        }
+        if (toDrop.length > 0 && this.renderer && this.fov && this.fov.isVisible(x, y)) {
+            this.renderer.addLogMessage(`${monster.name} drops ${toDrop.length} item(s).`);
+        }
+    }
+
     /**
      * Pick up item at player's position
      */

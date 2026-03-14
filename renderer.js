@@ -81,7 +81,11 @@ class Renderer {
             // Special
             stairs_down: '>',
             stairs_up: '<',
-            trap: '^'
+            trap: '^',
+            // Vegetation
+            vegetation_moss: ',',
+            vegetation_lichen: '\'',
+            vegetation_fungus: '~'
         };
         
         // Color classes for different elements
@@ -96,7 +100,10 @@ class Renderer {
             blood_low: 'blood_low',
             blood_mid: 'blood_mid',
             blood_high: 'blood_high',
-            stairs: 'stairs'
+            stairs: 'stairs',
+            vegetation_moss: 'vegetation_moss',
+            vegetation_lichen: 'vegetation_lichen',
+            vegetation_fungus: 'vegetation_fungus'
         };
         
         this.buffer = [];
@@ -231,10 +238,19 @@ class Renderer {
                                         // Generic liquids: tint color by dominant type
                                         const types = Object.entries(tile.liquids).sort((a,b)=>b[1]-a[1]);
                                         const main = types[0]?.[0];
+                                        const amount = types[0]?.[1] || 0;
                                         if (main === 'potion') color = 'potion_spill';
-                                        else color = 'blood_mid';
+                                        else if (main === 'water') {
+                                            char = amount >= 7 ? '~' : (amount >= 4 ? '=' : ',');
+                                            color = amount >= 7 ? 'liquid_water_high' : (amount >= 4 ? 'liquid_water_mid' : 'liquid_water_low');
+                                        } else color = 'blood_mid';
                                     } else {
-                                        color = visibility.visible ? 'floor' : 'floor_memory';
+                                        if (tile.vegetation) {
+                                            char = this.symbols['vegetation_' + tile.vegetation] || this.symbols.floor;
+                                            color = visibility.visible ? ('vegetation_' + tile.vegetation) : ('vegetation_' + tile.vegetation + '_memory');
+                                        } else {
+                                            color = visibility.visible ? 'floor' : 'floor_memory';
+                                        }
                                     }
                                 }
                             }
